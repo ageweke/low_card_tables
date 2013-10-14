@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency "bundler"
   s.add_development_dependency "rake"
-  s.add_development_dependency "rspec", "~> 2.1.4"
+  s.add_development_dependency "rspec", "~> 2.14"
 
   ar_version = ENV['LOW_CARD_TABLES_AR_TEST_VERSION']
   ar_version = ar_version.strip if ar_version
@@ -31,6 +31,8 @@ Gem::Specification.new do |s|
   end
 
   if version_spec
-    spec.add_dependency("activerecord", *version_spec)
+    s.add_dependency("activerecord", *version_spec)
   end
+
+  s.add_dependency "activesupport", ">= 3.0", "<= 4.99.99"
 end
