@@ -21,16 +21,16 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rake"
   s.add_development_dependency "rspec", "~> 2.1.4"
 
-  rails_version = ENV['LOW_CARD_TABLES_RAILS_TEST_VERSION']
-  rails_version = rails_version.strip if rails_version
+  ar_version = ENV['LOW_CARD_TABLES_AR_TEST_VERSION']
+  ar_version = ar_version.strip if ar_version
 
-  version_spec = case rails_version
+  version_spec = case ar_version
   when nil then [ ">= 3.0", "<= 4.99.99" ]
-  when 'master' then nil# { :git => 'git://github.com/rails/rails.git' }
-  else [ "=#{rails_version}" ]
+  when 'master' then nil
+  else [ "=#{ar_version}" ]
   end
 
   if version_spec
-    spec.add_dependency("rails", *version_spec)
+    spec.add_dependency("activerecord", *version_spec)
   end
 end
