@@ -20,18 +20,12 @@ module LowCardTables
         end
       end
 
-      def find_or_create_ids_for!(hash_or_hashes)
-        hashes = Array(hash_or_hashes)
-        hashes.each { |hash| assert_complete_key!(hash) }
+      def find_ids_for(hash_or_hashes)
+        do_find_or_create(hash_or_hashes, false)
+      end
 
-        existing = ids_matching(hashes)
-        still_not_found = hashes - existing.keys
-
-        if still_not_found.length > 0
-          flush_lock_and_create_ids_for!(hashes)
-        else
-          existing
-        end
+      def find_or_create_ids_for(hash_or_hashes)
+        do_find_or_create(hash_or_hashes, true)
       end
 
       def value_column_names
@@ -40,6 +34,25 @@ module LowCardTables
 
       private
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
+
+      def do_find_or_create(hash_or_hashes, do_create)
+        hashes = Array(hash_or_hashes)
+        hashes.each { |hash| assert_complete_key!(hash) }
+
+        existing = ids_matching(hashes)
+        still_not_found = hashes - existing.keys
+
+        if still_not_found.length > 0 && do_create
+          existing = flush_lock_and_create_ids_for!(hashes)
+        end
+
+        if hash_or_hashes.kind_of?(Array)
+          existing
+        else
+          existing[hash_or_hashes]
+        end
+      end
+
 
       # effectively private
       def value_columns
