@@ -15,6 +15,14 @@ module LowCardTables
         def is_low_card_table?
           true
         end
+
+        def low_card_options
+          @_low_card_options ||= { }
+        end
+
+        def low_card_options=(options)
+          @_low_card_options = options
+        end
       end
     end
   end

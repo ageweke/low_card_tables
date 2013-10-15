@@ -4,11 +4,12 @@ module LowCardTables
       def initialize(model_class, options = { })
         @model_class = model_class
         @options = options
-        @value_sets_by_id = nil
+
+        fill!
       end
 
-      def no_more_stale_than?(time_duration)
-        (! @value_sets_read_at) || ((Time.now - @value_sets_read_at) <= time_duration)
+      def loaded_at
+        @value_sets_read_at
       end
 
       def ids_matching(hash = nil, &block)
@@ -17,7 +18,6 @@ module LowCardTables
 
       def value_sets_matching(hash = nil, &block)
         out = [ ]
-        fill_if_necessary!
 
         @value_sets_by_id.each do |id, value_set|
           out << value_set if value_set.matches?(hash, block)
@@ -27,10 +27,6 @@ module LowCardTables
       end
 
       private
-      def fill_if_necessary!
-        fill! unless @value_sets_by_id
-      end
-
       def fill!
         raise "Cannot fill: we already have values!" if @value_sets_by_id
 

@@ -9,8 +9,9 @@ module LowCardTables
       include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
 
       module ClassMethods
-        def is_low_card_table
+        def is_low_card_table(options = { })
           include LowCardTables::LowCardTable::Base
+          self.low_card_options = options
         end
 
         def is_low_card_table?

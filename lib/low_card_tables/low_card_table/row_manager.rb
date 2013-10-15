@@ -9,22 +9,18 @@ module LowCardTables
         @low_card_model = low_card_model
       end
 
-      def cache_expiration=(time_interval)
-        unless time_interval && ((time_interval == :unlimited) || (time_interval.kind_of?(Float) && time_interval >= 0))
-          raise "You must supply a cache-expiration time that is a nonnegative number or :unlimited, not #{time_interval.inspect}"
-        end
-
-        @cache_expiration = time_interval
-      end
-
-      def cache_expiration
-        out = @cache_expiration
-        out = 1_000_000_000 if out == :unlimited # one billion seconds == 31 years
-        out ||
-      end
-
+      private
       def cache
-        if @cache && (! @cache.no_more_stale_than?())
+        @cache = nil if @cache && cache_expiration_policy_object.stale?(@cache.loaded_at, current_time)
+        @cache ||= LowCardTables::LowCardTable::Cache.new(@low_card_model, @low_card_model.low_card_options)
+      end
+
+      def cache_expiration_policy_object
+        @low_card_model.cache_expiration_policy_object || LowCardTables.cache_expiration_policy_object
+      end
+
+      def current_time
+        Time.now
       end
     end
   end
