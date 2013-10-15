@@ -12,18 +12,49 @@ module LowCardTables
         @value_sets_read_at
       end
 
-      def ids_matching(hash = nil, &block)
-        matching(hash, block).map(&:id)
+      def ids_matching(hash_or_hashes = nil, &block)
+        matching = value_sets_matching(hash_or_hashes, block)
+
+        case matching
+        when Array then matching.map(&:id)
+        when Hash then
+          out = { }
+          matching.each { |k,v| out[k] = v.map(&:id) }
+        when nil then nil
+        else raise "Unknown return value from #value_sets_matching: #{matching.inspect}"
+        end
       end
 
-      def value_sets_matching(hash = nil, &block)
-        out = [ ]
+      def value_sets_matching(hash_or_hashes = nil, &block)
+        hashes = Array(hash_or_hashes || [ ])
+        hashes.each { |h| raise ArgumentError, "You must supply Hashes, not: #{h.inspect}" unless h.kind_of?(Hash) }
 
-        @value_sets_by_id.each do |id, value_set|
-          out << value_set if value_set.matches?(hash, block)
+        if block && hashes.length > 0
+          raise ArgumentError, "You can supply either one or more Hashes to match against OR a block, but not both. Hashes: #{hashes.inspect}; block: #{block.inspect}"
+        elsif (! block) && hashes.length == 0
+          raise ArgumentError, "You must supply either one or more Hashes to match against or a block; you supplied neither."
         end
 
-        out
+
+        if hashes.length > 0
+          out = { }
+
+          @value_sets_by_id.each do |vs|
+            matching_hash = vs.matches?(hashes)
+            if matching_hash
+              out[matching_hash] ||= [ ]
+              out[matching_hash] << vs
+            end
+          end
+
+          if hash_or_hashes.kind_of?(Array)
+            out
+          else
+            out[hash_or_hashes]
+          end
+        else
+          @value_sets_by_id.values.select { |vs| vs.matches?(nil, &block) }
+        end
       end
 
       private

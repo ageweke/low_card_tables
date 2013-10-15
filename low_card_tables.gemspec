@@ -35,4 +35,18 @@ Gem::Specification.new do |s|
   end
 
   s.add_dependency "activesupport", ">= 3.0", "<= 4.99.99"
+
+  ar_import_version = case ar_version
+  when nil then nil
+  when 'master', /^4\.0\./ then '~> 0.4.1'
+  when /^3\.0\./ then '~> 0.2.11'
+  when /^3\.1\./ then '~> 0.3.1'
+  else raise "Don't know what activerecord-import version to require for activerecord version #{ar_version.inspect}!"
+  end
+
+  if ar_import_version
+    s.add_dependency("activerecord-import", ar_import_version)
+  else
+    s.add_dependency("activerecord-import")
+  end
 end

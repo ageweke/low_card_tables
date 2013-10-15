@@ -16,7 +16,7 @@ module LowCardTables
       def [](column_name)
         our_hash = to_hash
         unless our_hash.has_key?(column_name.to_s)
-          raise LowCardColumnNotPresentError, %{You're trying to select low-card rows from '#{@low_card_row.table_name}' and
+          raise LowCardTables::Errors::LowCardColumnNotPresentError, %{You're trying to select low-card rows from '#{@low_card_row.table_name}' and
 look at column '#{column_name}', but no such column exists. We have columns named:
 #{our_hash.keys.sort}}
         end
@@ -37,34 +37,35 @@ look at column '#{column_name}', but no such column exists. We have columns name
         end
       end
 
-      def matches?(hash = nil, &block)
-        if (hash && block) || ((! hash) && (! block))
-          raise "You must supply either a hash or a block, but not both, and not neither; you supplied #{hash.inspect} and #{block.inspect}"
+      def matches?(hash_or_hashes = nil, &block)
+        hashes = Array(hash_or_hashes || [ ])
+        hashes.each { |h| raise ArgumentError, "You must supply a Hash, not: #{h.inspect}" unless h.kind_of?(Hash) }
+
+        if (hashes.length > 0 && block) || (hashes.length == 0 && (! block))
+          raise "You must supply either a hash or a block, but not both, and not neither; you supplied #{hashes.inspect} and #{block.inspect}"
         end
 
-        if hash
-          matches = true
-          hash.keys.each do |key|
-            matches = false unless column_matches?(key, hash[key])
-          end
-
-          matches
+        if hashes.length > 0
+          hashes.detect { |hash| hash.keys.all? { |key| column_matches?(key, hash[key]) } }
         else
           !! block.call(self)
         end
       end
 
       private
+      def row_manager
+        @row_manager ||= @low_card_row.class._low_card_row_manager
+      end
+
       def to_hash
         @as_hash ||= begin
           out = { }
 
-          @low_card_row.columns.sort_by(&:name).each do |column|
-            next if column.primary
+          row_manager.value_columns.each do |column|
             out[column.name] = @low_card_row[column.name]
           end
 
-          out
+          out.with_indifferent_access
         end
       end
     end

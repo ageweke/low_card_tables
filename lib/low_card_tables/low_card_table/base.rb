@@ -23,6 +23,10 @@ module LowCardTables
         def low_card_options=(options)
           @_low_card_options = options
         end
+
+        def _low_card_row_manager
+          @_low_card_row_manager ||= LowCardTables::LowCardTable::RowManager.new(self)
+        end
       end
     end
   end
