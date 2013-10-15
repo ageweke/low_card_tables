@@ -25,7 +25,32 @@ module LowCardTables
         end
       end
 
-      private
+      def value_sets_for_ids(id_or_ids)
+        ids = Array(id_or_ids)
+
+        missing_ids = [ ]
+        out = { }
+
+        ids.each do |id|
+          vs = @value_sets_by_id[id]
+          if vs
+            out[id] = vs
+          else
+            missing_ids << id
+          end
+        end
+
+        unless missing_ids.length == 0
+          raise LowCardTables::Errors::LowCardIdNotFoundError, "Can't find IDs for low-card table #{@model_class.table_name}: #{missing_ids.join(", ")}"
+        end
+
+        if id_or_ids.kind_of?(Array)
+          out
+        else
+          out[id_or_ids]
+        end
+      end
+
       def value_sets_matching(hash_or_hashes = nil, &block)
         hashes = Array(hash_or_hashes || [ ])
         hashes.each { |h| raise ArgumentError, "You must supply Hashes, not: #{h.inspect}" unless h.kind_of?(Hash) }
