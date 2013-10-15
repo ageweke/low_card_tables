@@ -27,6 +27,8 @@ module LowCardTables
         def _low_card_row_manager
           @_low_card_row_manager ||= LowCardTables::LowCardTable::RowManager.new(self)
         end
+
+        delegate :ids_matching, :find_ids_for, :find_or_create_ids_for, :to => :_low_card_row_manager
       end
     end
   end

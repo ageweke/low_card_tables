@@ -17,6 +17,11 @@ module LowCardTables
         def is_low_card_table?
           false
         end
+
+        def has_low_card_table(*args)
+          include LowCardTables::HasLowCardTable::Base
+          has_low_card_table(*args)
+        end
       end
     end
   end
