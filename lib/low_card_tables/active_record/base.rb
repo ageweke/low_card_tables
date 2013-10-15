@@ -6,6 +6,7 @@ module LowCardTables
   module ActiveRecord
     module Base
       extend ActiveSupport::Concern
+      include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
 
       module ClassMethods
         def is_low_card_table

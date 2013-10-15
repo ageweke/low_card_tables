@@ -1,12 +1,14 @@
 require 'active_support/concern'
+require 'low_card_tables/low_card_table/cache_expiration/has_cache_expiration'
 
 module LowCardTables
   module LowCardTable
     module Base
       extend ActiveSupport::Concern
+      include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
 
-      included do
-
+      def to_low_card_value_set
+        LowCardTables::LowCardTable::ValueSet.new(self)
       end
 
       module ClassMethods
