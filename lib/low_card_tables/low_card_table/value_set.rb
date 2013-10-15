@@ -42,7 +42,7 @@ look at column '#{column_name}', but no such column exists. We have columns name
         hashes.each { |h| raise ArgumentError, "You must supply a Hash, not: #{h.inspect}" unless h.kind_of?(Hash) }
 
         if (hashes.length > 0 && block) || (hashes.length == 0 && (! block))
-          raise "You must supply either a hash or a block, but not both, and not neither; you supplied #{hashes.inspect} and #{block.inspect}"
+          raise ArgumentError, "You must supply either a hash or a block, but not both, and not neither; you supplied #{hashes.inspect} and #{block.inspect}"
         end
 
         if hashes.length > 0
@@ -61,8 +61,8 @@ look at column '#{column_name}', but no such column exists. We have columns name
         @as_hash ||= begin
           out = { }
 
-          row_manager.value_columns.each do |column|
-            out[column.name] = @low_card_row[column.name]
+          row_manager.value_column_names.each do |column_name|
+            out[column_name] = @low_card_row[column_name]
           end
 
           out.with_indifferent_access

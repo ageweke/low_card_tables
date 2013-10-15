@@ -21,10 +21,11 @@ module LowCardTables
           out = { }
           matching.each { |k,v| out[k] = v.map(&:id) }
         when nil then nil
-        else raise "Unknown return value from #value_sets_matching: #{matching.inspect}"
+        else raise "Unknown return value from #value_sets_matching; this should never happen: #{matching.inspect}"
         end
       end
 
+      private
       def value_sets_matching(hash_or_hashes = nil, &block)
         hashes = Array(hash_or_hashes || [ ])
         hashes.each { |h| raise ArgumentError, "You must supply Hashes, not: #{h.inspect}" unless h.kind_of?(Hash) }
@@ -57,7 +58,6 @@ module LowCardTables
         end
       end
 
-      private
       def fill!
         raise "Cannot fill: we already have values!" if @value_sets_by_id
 

@@ -11,7 +11,14 @@ module LowCardTables
         @low_card_model = low_card_model
       end
 
-      delegate :ids_matching, :to => :cache
+      def ids_matching(hash_or_hashes = nil, &block)
+        begin
+          cache.ids_matching(hash_or_hashes, &block)
+        rescue LowCardTables::Errors::LowCardColumnNotPresentError => lccnpe
+          flush!
+          cache.ids_matching(hash_or_hashes, &block)
+        end
+      end
 
       def find_or_create_ids_for!(hash_or_hashes)
         hashes = Array(hash_or_hashes)
@@ -27,6 +34,13 @@ module LowCardTables
         end
       end
 
+      def value_column_names
+        @value_column_names ||= value_columns.map(&:name)
+      end
+
+      private
+      COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
+
       # effectively private
       def value_columns
         @value_columns ||= @low_card_model.columns.select do |column|
@@ -38,13 +52,6 @@ module LowCardTables
           use
         end
       end
-
-      def value_column_names
-        @value_column_names ||= value_columns.map(&:name)
-      end
-
-      private
-      COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
 
       def flush_lock_and_create_ids_for!(hashes)
         with_locked_table do
@@ -139,8 +146,6 @@ equivalent of 'LOCK TABLE'(s) in your database.}
           (@low_card_model.low_card_options[:exclude_column_names] || [ ]).map { |n| n.to_s.strip.downcase }
         end
       end
-
-      delegate :value_sets_matching, :to => :cache
 
       def assert_complete_key!(hash)
         keys_as_strings = hash.keys.map(&:to_s)
