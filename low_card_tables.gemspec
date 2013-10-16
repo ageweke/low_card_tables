@@ -49,4 +49,8 @@ Gem::Specification.new do |s|
   else
     s.add_dependency("activerecord-import")
   end
+
+  require File.expand_path(File.join(File.dirname(__FILE__), 'spec', 'low_card_tables', 'helpers', 'database_helper'))
+  database_gem_name = LowCardTables::Helpers::DatabaseHelper.maybe_database_gem_name
+  s.add_development_dependency(database_gem_name) if database_gem_name
 end
