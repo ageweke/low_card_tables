@@ -1,6 +1,7 @@
 require 'active_record'
 require 'active_support/concern'
 require 'low_card_tables/low_card_table/base'
+require 'low_card_tables/has_low_card_table/base'
 
 module LowCardTables
   module ActiveRecord

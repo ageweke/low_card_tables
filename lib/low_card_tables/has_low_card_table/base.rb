@@ -1,4 +1,5 @@
 require 'active_support/concern'
+require 'low_card_tables/has_low_card_table/low_card_associations_manager'
 
 module LowCardTables
   module HasLowCardTable

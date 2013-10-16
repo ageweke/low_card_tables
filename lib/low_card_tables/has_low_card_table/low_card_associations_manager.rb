@@ -1,15 +1,17 @@
+require 'low_card_tables/has_low_card_table/low_card_association'
+
 module LowCardTables
   module HasLowCardTable
     class LowCardAssociationsManager
       def initialize(model_class)
-        if (! model_class.kind_of?(ActiveRecord::Base))
+        if (! superclasses(model_class).include?(::ActiveRecord::Base))
           raise ArgumentError, "You must supply an ActiveRecord model, not: #{model_class}"
         elsif model_class.is_low_card_table?
           raise ArgumentError, "A low-card table can't itself have low-card associations: #{model_class}"
         end
 
         @model_class = model_class
-        @associations = nil
+        @associations = { }
 
         install_methods!
       end
@@ -27,7 +29,7 @@ module LowCardTables
       end
 
       def _low_card_association(name)
-        @associations[name.to_s] || raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{association_name}' for #{@model_class.name}."
+        @associations[name.to_s] || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{association_name}' for #{@model_class.name}.")
       end
 
       def _low_card_update_values(model_instance)
@@ -39,6 +41,18 @@ module LowCardTables
       private
       def install_methods!
         @model_class.send(:before_save, :_low_card_update_values)
+      end
+
+      def superclasses(c)
+        out = [ ]
+
+        c = c.superclass
+        while c != Object
+          out << c
+          c = c.superclass
+        end
+
+        out
       end
     end
   end

@@ -10,7 +10,6 @@ describe LowCardTables do
 
     class ::CreateUserStatuses < ::ActiveRecord::Migration
       def self.up
-        $stderr.puts "CREATE USER STATUSES UP"
         drop_table :lctables_spec_user_statuses rescue nil
         create_table :lctables_spec_user_statuses do |t|
           t.boolean :deleted, :null => false
@@ -53,6 +52,8 @@ describe LowCardTables do
 
     class ::User < ActiveRecord::Base
       self.table_name = "lctables_spec_users"
+
+      has_low_card_table :status
     end
   end
 

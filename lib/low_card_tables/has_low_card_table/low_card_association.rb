@@ -35,7 +35,7 @@ module LowCardTables
       end
 
       private
-      attr_reader :association_name
+      attr_reader :association_name, :options, :model_class
 
       def install_methods!
         # We create an anonymous module and include it, so that the class itself can properly override the
@@ -47,7 +47,7 @@ module LowCardTables
     _low_card_association('#{association_name}').low_card_object(self)
   end})
 
-        @model_class.send(:include, new_module)
+        model_class.send(:include, new_module)
       end
 
       def get_id_from_model(model_instance)
@@ -64,13 +64,20 @@ module LowCardTables
 
       def foreign_key_column_name
         @foreign_key_column_name ||= begin
-          out = options[:foreign_key] || "#{association_name}_id"
+          out = options[:foreign_key]
+
+          unless out
+            out = low_card_class.name.underscore
+            out = $1 if out =~ %r{/[^/]+$}i
+            out = out + "_id"
+          end
+
           out = out.to_s if out.kind_of?(Symbol)
 
-          column = @model_class.columns.detect { |c| c.name.strip.downcase == out.strip.downcase }
+          column = model_class.columns.detect { |c| c.name.strip.downcase == out.strip.downcase }
           unless column
-            raise ArgumentError, %{You said that #{@model_class} has_low_card_table #{association_name}, and we
-have a foreign-key column name of #{out.inspect}, but #{@model_class} doesn't seem
+            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name}, and we
+have a foreign-key column name of #{out.inspect}, but #{model_class} doesn't seem
 to have a column named that at all. Did you misspell it? Or perhaps something else is wrong?}
           end
         end
@@ -79,15 +86,16 @@ to have a column named that at all. Did you misspell it? Or perhaps something el
       def low_card_class
         @low_card_class ||= begin
           # e.g., class User has_low_card_table :status => UserStatus
-          out = options[:class] || "#{@model_class.name.underscore.singularize}_#{association_name}"
+          out = options[:class] || "#{model_class.name.underscore.singularize}_#{association_name}"
 
           out = out.to_s if out.kind_of?(Symbol)
+          out = out.camelize
 
           if out.kind_of?(String)
             begin
               out = out.constantize
             rescue NameError => ne
-              raise ArgumentError, %{You said that #{@model_class} has_low_card_table #{association_name} with a
+              raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name}, and we have a
 :class of #{out.inspect}, but, when we tried to load that class (via #constantize),
 we got a NameError. Perhaps you misspelled it, or something else is wrong?
 
@@ -96,13 +104,13 @@ NameError: (#{ne.class.name}): #{ne.message}}
           end
 
           unless out.kind_of?(Class)
-            raise ArgumentError, %{You said that #{@model_class} has_low_card_table #{association_name} with a
+            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name} with a
 :class of #{out.inspect}, but that isn't a String or Symbol that represents a class,
 or a valid Class object itself.}
           end
 
           unless out.respond_to?(:is_low_card_table?) && out.is_low_card_table?
-            raise ArgumentError, %{You said that #{@model_class} has_low_card_table #{association_name},
+            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name},
 and we have class #{out} for that low-card table (which is a Class), but it
 either isn't an ActiveRecord model or, if so, it doesn't think it is a low-card
 table itself (#is_low_card_table? returns false).
@@ -115,8 +123,8 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
       end
 
       def ensure_correct_class!(model_instance)
-        unless model_instance.kind_of?(@model_class)
-          raise %{Whoa! The LowCardAssociation '#{@association_name}' for class #{@model_class} somehow
+        unless model_instance.kind_of?(model_class)
+          raise %{Whoa! The LowCardAssociation '#{association_name}' for class #{model_class} somehow
 was passed a model of class #{model_instance.class} (model: #{model_instance}),
 which is not of the correct class.}
         end
