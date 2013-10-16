@@ -21,6 +21,8 @@ module LowCardTables
       end
 
       def ids_matching(hash_or_hashes = nil, &block)
+        Array(hash_or_hashes || [ ]).each { |h| assert_partial_key!(h) }
+
         begin
           cache.ids_matching(hash_or_hashes, &block)
         rescue LowCardTables::Errors::LowCardColumnNotPresentError => lccnpe
@@ -177,6 +179,15 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         if missing.length > 0
           raise LowCardTables::Errors::LowCardColumnNotSpecifiedError, "The following is not a complete specification of all columns in low-card table '#{@low_card_model.table_name}'; it is missing these columns: #{missing.join(", ")}: #{hash.inspect}"
         end
+
+        if extra.length > 0
+          raise LowCardTables::Errors::LowCardColumnNotPresentError, "The following specifies extra columns that are not present in low-card table '#{@low_card_model.table_name}'; these columns are not present in the underlying model: #{extra.join(", ")}: #{hash.inspect}"
+        end
+      end
+
+      def assert_partial_key!(hash)
+        keys_as_strings = hash.keys.map(&:to_s)
+        extra = keys_as_strings - value_column_names
 
         if extra.length > 0
           raise LowCardTables::Errors::LowCardColumnNotPresentError, "The following specifies extra columns that are not present in low-card table '#{@low_card_model.table_name}'; these columns are not present in the underlying model: #{extra.join(", ")}: #{hash.inspect}"
