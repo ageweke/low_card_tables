@@ -27,18 +27,18 @@ module LowCardTables
       end
 
       def _low_card_association(name)
-        @association_name[name.to_s] || raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{association_name}' for #{@model_class.name}."
+        @associations[name.to_s] || raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{association_name}' for #{@model_class.name}."
       end
 
-      def _low_card_update_values
-        raise "nyi"
+      def _low_card_update_values(model_instance)
+        @associations.values.each do |association|
+          update_value_before_save!(model_instance)
+        end
       end
 
       private
       def install_methods!
-        @model_class.class_eval %{
-  before_save :_low_card_update_values
-}
+        @model_class.send(:before_save, :_low_card_update_values)
       end
     end
   end

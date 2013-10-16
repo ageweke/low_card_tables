@@ -20,6 +20,10 @@ module LowCardTables
         end
       end
 
+      def row_for_id(id)
+        rows_for_ids(id)
+      end
+
       def ids_matching(hash_or_hashes = nil, &block)
         do_matching(hash_or_hashes, block, :ids_matching)
       end

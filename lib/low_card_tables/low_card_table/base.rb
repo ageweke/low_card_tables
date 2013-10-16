@@ -40,7 +40,11 @@ module LowCardTables
           block.call(self)
         end
 
-        delegate :rows_for_ids, :ids_matching, :find_ids_for, :find_or_create_ids_for, :to => :_low_card_row_manager, :prefix => :low_card
+        def _low_card_value_column_names
+          _low_card_row_manager.value_column_names
+        end
+
+        delegate :row_for_id, :rows_for_ids, :ids_matching, :find_ids_for, :find_or_create_ids_for, :to => :_low_card_row_manager, :prefix => :low_card
       end
     end
   end

@@ -15,10 +15,10 @@ module LowCardTables
         def _low_card_association(name)
           _low_card_associations_manager._low_card_association(name)
         end
+      end
 
-        def _low_card_update_values
-          _low_card_associations_manager._low_card_update_values
-        end
+      def _low_card_update_values
+        _low_card_associations_manager._low_card_update_values(self)
       end
     end
   end
