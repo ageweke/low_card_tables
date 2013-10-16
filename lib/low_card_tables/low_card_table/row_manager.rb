@@ -11,12 +11,12 @@ module LowCardTables
         @low_card_model = low_card_model
       end
 
-      def value_sets_for_ids(id_or_ids)
+      def rows_for_ids(id_or_ids)
         begin
-          cache.value_sets_for_ids(id_or_ids)
+          cache.rows_for_ids(id_or_ids)
         rescue LowCardTables::Errors::LowCardIdNotFoundError => lcinfe
           flush!
-          cache.value_sets_for_ids(id_or_ids)
+          cache.rows_for_ids(id_or_ids)
         end
       end
 

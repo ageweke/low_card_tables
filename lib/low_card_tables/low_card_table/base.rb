@@ -7,10 +7,6 @@ module LowCardTables
       extend ActiveSupport::Concern
       include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
 
-      def to_low_card_value_set
-        LowCardTables::LowCardTable::ValueSet.new(self)
-      end
-
       module ClassMethods
         def is_low_card_table?
           true
@@ -26,6 +22,14 @@ module LowCardTables
 
         def _low_card_row_manager
           @_low_card_row_manager ||= LowCardTables::LowCardTable::RowManager.new(self)
+        end
+
+        def _low_card_row_matches_hash?(hashes)
+          # return Hash or nil
+        end
+
+        def _low_card_row_matches_block?(block)
+          block.call(self)
         end
 
         delegate :ids_matching, :find_ids_for, :find_or_create_ids_for, :to => :_low_card_row_manager

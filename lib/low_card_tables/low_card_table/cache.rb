@@ -9,11 +9,11 @@ module LowCardTables
       end
 
       def loaded_at
-        @value_sets_read_at
+        @rows_read_at
       end
 
       def ids_matching(hash_or_hashes = nil, &block)
-        matching = value_sets_matching(hash_or_hashes, block)
+        matching = rows_matching(hash_or_hashes, block)
 
         case matching
         when Array then matching.map(&:id)
@@ -21,20 +21,20 @@ module LowCardTables
           out = { }
           matching.each { |k,v| out[k] = v.map(&:id) }
         when nil then nil
-        else raise "Unknown return value from #value_sets_matching; this should never happen: #{matching.inspect}"
+        else raise "Unknown return value from #rows_matching; this should never happen: #{matching.inspect}"
         end
       end
 
-      def value_sets_for_ids(id_or_ids)
+      def rows_for_ids(id_or_ids)
         ids = Array(id_or_ids)
 
         missing_ids = [ ]
         out = { }
 
         ids.each do |id|
-          vs = @value_sets_by_id[id]
-          if vs
-            out[id] = vs
+          r = @rows_by_id[id]
+          if r
+            out[id] = r
           else
             missing_ids << id
           end
@@ -51,7 +51,7 @@ module LowCardTables
         end
       end
 
-      def value_sets_matching(hash_or_hashes = nil, &block)
+      def rows_matching(hash_or_hashes = nil, &block)
         hashes = Array(hash_or_hashes || [ ])
         hashes.each { |h| raise ArgumentError, "You must supply Hashes, not: #{h.inspect}" unless h.kind_of?(Hash) }
 
@@ -65,11 +65,11 @@ module LowCardTables
         if hashes.length > 0
           out = { }
 
-          @value_sets_by_id.each do |vs|
-            matching_hash = vs.matches?(hashes)
+          @rows_by_id.each do |r|
+            matching_hash = r._low_card_row_matches_hash?(hashes)
             if matching_hash
               out[matching_hash] ||= [ ]
-              out[matching_hash] << vs
+              out[matching_hash] << r
             end
           end
 
@@ -79,12 +79,12 @@ module LowCardTables
             out[hash_or_hashes]
           end
         else
-          @value_sets_by_id.values.select { |vs| vs.matches?(nil, &block) }
+          @rows_by_id.values.select { |r| r._low_card_row_matches_block?(block) }
         end
       end
 
       def fill!
-        raise "Cannot fill: we already have values!" if @value_sets_by_id
+        raise "Cannot fill: we already have values!" if @rows_by_id
 
         # We ask for one more than the number of rows we are willing to accept here; this is so that if we have
         # too many rows, we can detect it, but we still won't do something crazy like try to load one million
@@ -98,17 +98,26 @@ module LowCardTables
         raw_rows.each do |raw_row|
           id = raw_row.id
           raise_duplicate_id_error(id, out[id], raw_row) if out[id]
-          out[id] = raw_row.to_low_card_value_set
+          out[id] = raw_row
         end
 
-        @value_sets_by_id = out
-        @value_sets_read_at = read_rows_time
+        @rows_by_id = out
+        @rows_read_at = read_rows_time
       end
 
       DEFAULT_MAX_ROW_COUNT = 5_000
 
       def max_row_count
         @options[:max_row_count] || DEFAULT_MAX_ROW_COUNT
+      end
+
+      def raise_too_many_rows_error
+        raise %{We tried to read in all the rows for low-card table '#{@model_class.table_name}', but there were
+more rows that we are willing to handle -- there are at least #{max_row_count + 1}.
+Most likely, something has gone horribly wrong with your low-card table (such as you
+starting to store data that is not, in fact, low-cardinality at all). Alternatively,
+perhaps you need to declare :max_row_count => (some larger value) in your
+is_low_card_table declaration.}
       end
 
       def raise_duplicate_id_error(id, row_one, row_two)
