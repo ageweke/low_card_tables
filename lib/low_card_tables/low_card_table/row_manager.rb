@@ -21,14 +21,11 @@ module LowCardTables
       end
 
       def ids_matching(hash_or_hashes = nil, &block)
-        Array(hash_or_hashes || [ ]).each { |h| assert_partial_key!(h) }
+        do_matching(hash_or_hashes, block, :ids_matching)
+      end
 
-        begin
-          cache.ids_matching(hash_or_hashes, &block)
-        rescue LowCardTables::Errors::LowCardColumnNotPresentError => lccnpe
-          flush!
-          cache.ids_matching(hash_or_hashes, &block)
-        end
+      def rows_matching(hash_or_hashes = nil, &block)
+        do_matching(hash_or_hashes, block, :rows_matching)
       end
 
       def find_ids_for(hash_or_hashes)
@@ -45,6 +42,17 @@ module LowCardTables
 
       private
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
+
+      def do_matching(hash_or_hashes, block, method_name)
+        Array(hash_or_hashes || [ ]).each { |h| assert_partial_key!(h) }
+
+        begin
+          cache.send(method_name, hash_or_hashes, &block)
+        rescue LowCardTables::Errors::LowCardColumnNotPresentError => lccnpe
+          flush!
+          cache.send(method_name, hash_or_hashes, &block)
+        end
+      end
 
       def do_find_or_create(hash_or_hashes, do_create)
         hashes = Array(hash_or_hashes)

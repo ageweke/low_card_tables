@@ -40,7 +40,7 @@ module LowCardTables
           block.call(self)
         end
 
-        delegate :ids_matching, :find_ids_for, :find_or_create_ids_for, :to => :_low_card_row_manager
+        delegate :rows_for_ids, :ids_matching, :find_ids_for, :find_or_create_ids_for, :to => :_low_card_row_manager, :prefix => :low_card
       end
     end
   end
