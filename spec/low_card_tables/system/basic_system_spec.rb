@@ -45,6 +45,7 @@ describe LowCardTables do
 
       define_model_class(:UserStatus, 'lctables_spec_user_statuses') { is_low_card_table }
       define_model_class(:User, 'lctables_spec_users') { has_low_card_table :status }
+      define_model_class(:UserStatusBackdoor, 'lctables_spec_user_statuses') { }
     end
 
     after :each do
@@ -75,6 +76,15 @@ describe LowCardTables do
       it "should allow setting all options, and create an appropriate row" do
         # we're really just testing the :before block here
         @user1.should be
+
+        rows = ::UserStatusBackdoor.all
+        rows.length.should == 1
+        row = rows[0]
+        row.id.should == @user1.user_status_id
+        row.deleted.should == false
+        row.deceased.should == false
+        row.gender.should == 'female'
+        row.donation_level.should == 3
       end
 
       it "should expose a low-card row, but not with an ID, when read in from the DB" do
@@ -91,6 +101,24 @@ describe LowCardTables do
         lambda { @user1.status.save! }.should raise_error
         @user1.deleted = true
         lambda { @user1.status.save! }.should raise_error
+      end
+
+      it "should allow changing a property, and create another row, but only for the final set" do
+        previous_status_id = @user1.user_status_id
+
+        @user1.gender = 'unknown'
+        @user1.gender = 'male'
+        @user1.donation_level = 1
+        @user1.save!
+
+        rows = ::UserStatusBackdoor.all
+        rows.length.should == 2
+        new_row = rows.detect { |r| r.id != previous_status_id }
+        new_row.id.should == @user1.user_status_id
+        new_row.deleted.should == false
+        new_row.deceased.should == false
+        new_row.gender.should == 'male'
+        new_row.donation_level.should == 1
       end
     end
   end
