@@ -1,5 +1,6 @@
 require 'active_support/concern'
 require 'low_card_tables/has_low_card_table/low_card_associations_manager'
+require 'low_card_tables/has_low_card_table/low_card_objects_manager'
 
 module LowCardTables
   module HasLowCardTable
@@ -19,7 +20,11 @@ module LowCardTables
       end
 
       def _low_card_update_values
-        _low_card_associations_manager._low_card_update_values(self)
+        self.class._low_card_associations_manager._low_card_update_values(self)
+      end
+
+      def _low_card_objects_manager
+        @_low_card_objects_manager ||= LowCardTables::HasLowCardTable::LowCardObjectsManager.new(self)
       end
     end
   end

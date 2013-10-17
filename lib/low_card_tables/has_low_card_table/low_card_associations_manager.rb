@@ -1,4 +1,5 @@
 require 'low_card_tables/has_low_card_table/low_card_association'
+require 'low_card_tables/errors'
 
 module LowCardTables
   module HasLowCardTable
@@ -21,6 +22,8 @@ module LowCardTables
           raise ArgumentError, "You must supply an association name, not: #{association_name.inspect}"
         end
 
+        association_name = association_name.to_s.strip.downcase
+
         if @associations[association_name]
           raise LowCardTables::Errors::LowCardAssociationAlreadyExistsError, "There is already a low-card association named '#{association_name}' for #{@model_class.name}."
         end
@@ -29,12 +32,12 @@ module LowCardTables
       end
 
       def _low_card_association(name)
-        @associations[name.to_s] || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{association_name}' for #{@model_class.name}.")
+        @associations[name.to_s] || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{name}' for #{@model_class.name}; there are associations named: #{@associations.keys.sort.join(", ")}.")
       end
 
       def _low_card_update_values(model_instance)
         @associations.values.each do |association|
-          update_value_before_save!(model_instance)
+          association.update_value_before_save!(model_instance)
         end
       end
 

@@ -13,7 +13,7 @@ module LowCardTables
       end
 
       def ids_matching(hash_or_hashes = nil, &block)
-        matching = rows_matching(hash_or_hashes, block)
+        matching = rows_matching(hash_or_hashes, &block)
 
         case matching
         when Array then matching.map(&:id)
@@ -65,7 +65,7 @@ module LowCardTables
         if hashes.length > 0
           out = { }
 
-          @rows_by_id.each do |r|
+          @rows_by_id.each do |id,r|
             matching_hash = r._low_card_row_matches_any_hash?(hashes)
             if matching_hash
               out[matching_hash] ||= [ ]
@@ -129,7 +129,6 @@ We have at least two rows with ID #{id.inspect}:
 and
 
 #{row_two}}
-        end
       end
     end
   end

@@ -16,18 +16,28 @@ module LowCardTables
         low_card_class
       end
 
-      def low_card_object(model_instance)
+      def create_low_card_object_for(model_instance)
         ensure_correct_class!(model_instance)
-        low_card_class.row_for_id(get_id_from_model(model_instance))
+
+        id = get_id_from_model(model_instance)
+        out = if id
+          template = low_card_class.row_for_id(get_id_from_model(model_instance))
+          template.dup
+        else
+          low_card_class.new
+        end
       end
 
       def update_value_before_save!(model_instance)
         hash = { }
+
+        low_card_object = model_instance._low_card_objects_manager.object_for(association_name)
+
         low_card_class._low_card_value_column_names.each do |value_column_name|
-          hash[value_column_name] = get_value_column_from_model(model_instance, value_column_name)
+          hash[value_column_name] = low_card_object[value_column_name]
         end
 
-        new_id = low_card_class.find_or_create_ids_for(hash)
+        new_id = low_card_class.low_card_find_or_create_ids_for(hash)
 
         unless get_id_from_model(model_instance) == new_id
           set_id_on_model(model_instance, new_id)
@@ -44,18 +54,26 @@ module LowCardTables
         new_module = Module.new
         new_module.module_eval(%{
   def #{association_name}
-    _low_card_association('#{association_name}').low_card_object(self)
+    _low_card_objects_manager.object_for('#{association_name}')
   end})
+
+        low_card_class._low_card_value_column_names.each do |column_name|
+          new_module.module_eval(%{
+  def #{column_name}
+    #{association_name}.#{column_name}
+  end
+
+  def #{column_name}=(x)
+    #{association_name}.#{column_name} = x
+  end
+  })
+        end
 
         model_class.send(:include, new_module)
       end
 
       def get_id_from_model(model_instance)
         model_instance[foreign_key_column_name]
-      end
-
-      def get_value_column_from_model(model_instance, value_column_name)
-        model_instance[value_column_name]
       end
 
       def set_id_on_model(model_instance, new_id)
@@ -80,6 +98,14 @@ module LowCardTables
 have a foreign-key column name of #{out.inspect}, but #{model_class} doesn't seem
 to have a column named that at all. Did you misspell it? Or perhaps something else is wrong?}
           end
+        end
+      end
+
+      def ensure_correct_class!(model_instance)
+        unless model_instance.kind_of?(model_class)
+          raise %{Whoa! The LowCardAssociation '#{association_name}' for class #{model_class} somehow
+was passed a model of class #{model_instance.class} (model: #{model_instance}),
+which is not of the correct class.}
         end
       end
 
@@ -119,14 +145,6 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
           end
 
           out
-        end
-      end
-
-      def ensure_correct_class!(model_instance)
-        unless model_instance.kind_of?(model_class)
-          raise %{Whoa! The LowCardAssociation '#{association_name}' for class #{model_class} somehow
-was passed a model of class #{model_instance.class} (model: #{model_instance}),
-which is not of the correct class.}
         end
       end
     end

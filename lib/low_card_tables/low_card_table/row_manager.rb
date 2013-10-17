@@ -1,4 +1,6 @@
 require 'active_support'
+require 'activerecord-import'
+require 'low_card_tables/low_card_table/cache'
 
 module LowCardTables
   module LowCardTable
@@ -10,7 +12,6 @@ module LowCardTables
 
         @low_card_model = low_card_model
       end
-
       def rows_for_ids(id_or_ids)
         begin
           cache.rows_for_ids(id_or_ids)
@@ -48,7 +49,8 @@ module LowCardTables
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
 
       def do_matching(hash_or_hashes, block, method_name)
-        Array(hash_or_hashes || [ ]).each { |h| assert_partial_key!(h) }
+        hashes = if hash_or_hashes.kind_of?(Array) then hash_or_hashes else [ hash_or_hashes ] end
+        hashes.each { |h| assert_partial_key!(h) }
 
         begin
           cache.send(method_name, hash_or_hashes, &block)
@@ -59,7 +61,7 @@ module LowCardTables
       end
 
       def do_find_or_create(hash_or_hashes, do_create)
-        hashes = Array(hash_or_hashes)
+        hashes = if hash_or_hashes.kind_of?(Array) then hash_or_hashes else [ hash_or_hashes ] end
         hashes.each { |hash| assert_complete_key!(hash) }
 
         existing = ids_matching(hashes)
@@ -75,7 +77,6 @@ module LowCardTables
           existing[hash_or_hashes]
         end
       end
-
 
       # effectively private
       def value_columns
@@ -144,7 +145,8 @@ couldn't find:
         case @low_card_model.connection.class.name
         when /postgresql/i then with_database_exclusive_table_lock_postgresql(&block)
         when /mysql/i then with_database_exclusive_table_lock_mysql(&block)
-        else raise LowCardTables::Errors::UnsupportedDatabaseError, %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
+        else
+          raise LowCardTables::Errors::UnsupportedDatabaseError, %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
 but, when we went to create them, we discovered that we don't know how to exclusively
 lock tables in your database. (This is very important so that we don't accidentally
 create duplicate rows.)
@@ -152,10 +154,15 @@ create duplicate rows.)
 Your database adapter's class name is '#{@low_card_model.connection.class.name}'; please submit at least
 a bug report, or, even better, a patch. :) Adding support is quite easy, as long as you know the
 equivalent of 'LOCK TABLE'(s) in your database.}
+        end
       end
 
       def with_database_exclusive_table_lock_postgresql(&block)
-        run_sql("LOCK TABLE :table", :table => @low_card_model.table_name)
+        # If we just use the regular :sanitize_sql support, we get:
+        #    LOCK TABLE 'foo'
+        # ...which, for whatever reason, PostgreSQL doesn't like. Escaping it this way works fine.
+        escaped = @low_card_model.connection.quote_table_name(@low_card_model.table_name)
+        run_sql("LOCK TABLE #{escaped}", { })
         block.call
       end
 

@@ -9,7 +9,6 @@ module LowCardTables
             dh = new
             dh.database_gem_name
           rescue InvalidDatabaseConfigurationError => idce
-            $stderr.puts idce
             nil
           end
         end

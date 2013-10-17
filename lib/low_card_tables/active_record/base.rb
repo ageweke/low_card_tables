@@ -20,7 +20,11 @@ module LowCardTables
         end
 
         def has_low_card_table(*args)
-          include LowCardTables::HasLowCardTable::Base
+          unless @_low_card_has_low_card_table_included
+            include LowCardTables::HasLowCardTable::Base
+            @_low_card_has_low_card_table_included = true
+          end
+
           has_low_card_table(*args)
         end
       end

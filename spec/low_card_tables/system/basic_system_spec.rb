@@ -70,5 +70,12 @@ describe LowCardTables do
       u.donation_level = 3
       u.save!
     end
+
+    it "should expose a low-card row, but not with an ID" do
+      u = User.where(:name => 'User1').first
+      u.should be
+      u.user_status.should be
+      u.user_status.id.should_not be
+    end
   end
 end
