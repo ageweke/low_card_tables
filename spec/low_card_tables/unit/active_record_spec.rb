@@ -28,7 +28,7 @@ describe LowCardTables::ActiveRecord::Base do
 
     context "#cache_expiration" do
       it "should be nil by default" do
-        @ar_class.cache_expiration.should_not be
+        @ar_class.low_card_cache_expiration.should_not be
       end
     end
   end

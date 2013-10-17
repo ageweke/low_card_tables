@@ -15,14 +15,17 @@ module LowCardTables
       def ids_matching(hash_or_hashes = nil, &block)
         matching = rows_matching(hash_or_hashes, &block)
 
-        case matching
+        out = case matching
         when Array then matching.map(&:id)
         when Hash then
-          out = { }
-          matching.each { |k,v| out[k] = v.map(&:id) }
+          h = { }
+          matching.each { |k,v| h[k] = v.map(&:id) }
+          h
         when nil then nil
         else raise "Unknown return value from #rows_matching; this should never happen: #{matching.inspect}"
         end
+
+        out
       end
 
       def rows_for_ids(id_or_ids)

@@ -9,28 +9,27 @@ module LowCardTables
         extend ActiveSupport::Concern
 
         module ClassMethods
-          def cache_expiration=(type_or_number, options = { })
-            @_cache_expiration_policy_object = if type_or_number.kind_of?(Numeric)
+          def low_card_cache_expiration=(type_or_number, options = { })
+            @_low_card_cache_expiration_policy_object = if type_or_number.kind_of?(Numeric)
+              @_low_card_cache_expiration_return_value = type_or_number
               LowCardTables::LowCardTable::CacheExpiration::FixedCacheExpirationPolicy.new(type_or_number)
-              @_cache_expiration_return_value = type_or_number
             elsif type_or_number == :unlimited
+              @_low_card_cache_expiration_return_value = :unlimited
               LowCardTables::LowCardTable::CacheExpiration::UnlimitedCacheExpirationPolicy.new(type_or_number)
-              @_cache_expiration_return_value = :unlimited
             elsif type_or_number == :exponential
+              @_low_card_cache_expiration_return_value = [ :exponential, :options ]
               LowCardTables::LowCardTable::CacheExpiration::ExponentialCacheExpirationPolicy.new(options)
-              @_cache_expiration_return_value = [ :exponential, :options ]
             else
               raise ArgumentError, "Invalid cache expiration time argumnet '#{type_or_number.inspect}'; you must pass a number, :unlimited, or :exponential."
             end
           end
 
-          def cache_expiration
-            @_cache_expiration_return_value
+          def low_card_cache_expiration
+            @_low_card_cache_expiration_return_value
           end
 
-          private
-          def cache_expiration_policy_object
-            @_cache_expiration_policy_object
+          def low_card_cache_expiration_policy_object
+            @_low_card_cache_expiration_policy_object
           end
         end
       end

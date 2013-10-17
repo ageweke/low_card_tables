@@ -12,6 +12,7 @@ module LowCardTables
 
         @low_card_model = low_card_model
       end
+
       def rows_for_ids(id_or_ids)
         begin
           cache.rows_for_ids(id_or_ids)
@@ -71,10 +72,24 @@ module LowCardTables
           existing = flush_lock_and_create_ids_for!(hashes)
         end
 
+        out = { }
+        existing.each do |key, values|
+          if values.length != 1
+            raise %{Whoa: we asked for an ID for this hash: #{key.inspect};
+since this has been asserted to be a complete key, we should only ever get back a single value,
+and we should always get back one value since we will have created the row if necessary,
+but we got back these values:
+
+#{values.inspect}}
+          end
+
+          out[key] = values[0]
+        end
+
         if hash_or_hashes.kind_of?(Array)
-          existing
+          out
         else
-          existing[hash_or_hashes]
+          out[hash_or_hashes]
         end
       end
 
@@ -226,7 +241,7 @@ equivalent of 'LOCK TABLE'(s) in your database.}
       end
 
       def cache_expiration_policy_object
-        @low_card_model.cache_expiration_policy_object || LowCardTables.cache_expiration_policy_object
+        @low_card_model.low_card_cache_expiration_policy_object || LowCardTables.low_card_cache_expiration_policy_object
       end
 
       def current_time

@@ -61,21 +61,31 @@ describe LowCardTables do
       ::UserStatus.low_card_options.should == { }
     end
 
-    it "should allow setting all options, and create an appropriate row" do
-      u = ::User.new
-      u.name = 'User1'
-      u.deleted = false
-      u.deceased = false
-      u.gender = 'female'
-      u.donation_level = 3
-      u.save!
-    end
+    context "with a trivial setup" do
+      before :each do
+        @user1 = ::User.new
+        @user1.name = 'User1'
+        @user1.deleted = false
+        @user1.deceased = false
+        @user1.gender = 'female'
+        @user1.donation_level = 3
+        @user1.save!
+      end
 
-    it "should expose a low-card row, but not with an ID" do
-      u = User.where(:name => 'User1').first
-      u.should be
-      u.user_status.should be
-      u.user_status.id.should_not be
+      it "should allow setting all options, and create an appropriate row" do
+        # we're really just testing the :before block here
+        @user1.should be
+      end
+
+      it "should expose a low-card row, but not with an ID, when read in from the DB" do
+        @user1.status.should be
+        @user1.status.id.should_not be
+
+        user1_v2 = User.where(:name => 'User1').first
+        user1_v2.should be
+        user1_v2.status.should be
+        user1_v2.status.id.should_not be
+      end
     end
   end
 end

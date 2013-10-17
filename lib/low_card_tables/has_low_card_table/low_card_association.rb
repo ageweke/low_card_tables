@@ -20,12 +20,18 @@ module LowCardTables
         ensure_correct_class!(model_instance)
 
         id = get_id_from_model(model_instance)
-        out = if id
-          template = low_card_class.row_for_id(get_id_from_model(model_instance))
-          template.dup
+
+        out = nil
+        if id
+          template = low_card_class.low_card_row_for_id(get_id_from_model(model_instance))
+          out = template.dup
+          out.id = nil
+          out
         else
-          low_card_class.new
+          out = low_card_class.new
         end
+
+        out
       end
 
       def update_value_before_save!(model_instance)
@@ -98,6 +104,8 @@ module LowCardTables
 have a foreign-key column name of #{out.inspect}, but #{model_class} doesn't seem
 to have a column named that at all. Did you misspell it? Or perhaps something else is wrong?}
           end
+
+          out
         end
       end
 
