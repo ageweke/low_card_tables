@@ -74,7 +74,6 @@ describe LowCardTables do
       end
 
       it "should allow setting all options, and create an appropriate row" do
-        # we're really just testing the :before block here
         @user1.should be
 
         rows = ::UserStatusBackdoor.all
@@ -85,6 +84,12 @@ describe LowCardTables do
         row.deceased.should == false
         row.gender.should == 'female'
         row.donation_level.should == 3
+
+        user1_v2 = User.where(:name => 'User1').first
+        user1_v2.deleted.should == false
+        user1_v2.deceased.should == false
+        user1_v2.gender.should == 'female'
+        user1_v2.donation_level.should == 3
       end
 
       it "should expose a low-card row, but not with an ID, when read in from the DB" do
@@ -120,6 +125,41 @@ describe LowCardTables do
         new_row.gender.should == 'male'
         new_row.donation_level.should == 1
       end
+
+      it "should allow creating another associated row, and they should be independent, even if they start with the same low-card ID" do
+        user2 = ::User.new
+        user2.name = 'User2'
+        user2.deleted = false
+        user2.deceased = false
+        user2.gender = 'female'
+        user2.donation_level = 3
+        user2.save!
+
+        @user1.user_status_id.should == user2.user_status_id
+
+        user2.deleted = true
+        user2.save!
+
+        @user1.user_status_id.should_not == user2.user_status_id
+        @user1.deleted.should == false
+        user2.deleted.should == true
+
+        user1_v2 = ::User.where(:name => 'User1').first
+        user2_v2 = ::User.where(:name => 'User2').first
+
+        user1_v2.deleted.should == false
+        user2_v2.deleted.should == true
+      end
+
+      it "should allow validations on the low-card table that are enforced"
+      it "should allow the associated table to validate low-card data"
+      it "should gracefully handle database-level rejection of a new low-card row"
+
+      it "should handle schema changes to the low-card table"
+      it "should be able to remove low-card columns and automatically update associated rows"
+
+      it "should cache low-card rows in memory"
+      it "should throw out the cache if the schema has changed"
     end
   end
 end
