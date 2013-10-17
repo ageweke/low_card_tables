@@ -10,5 +10,7 @@ module LowCardTables
     class LowCardAssociationError < LowCardError; end
     class LowCardAssociationAlreadyExistsError < LowCardAssociationError; end
     class LowCardAssociationNotFoundError < LowCardAssociationError; end
+
+    class LowCardCannotSaveAssociatedLowCardObjectsError < LowCardError; end
   end
 end

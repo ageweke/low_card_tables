@@ -86,6 +86,12 @@ describe LowCardTables do
         user1_v2.status.should be
         user1_v2.status.id.should_not be
       end
+
+      it "should not allow re-saving the status to the DB, with or without changes" do
+        lambda { @user1.status.save! }.should raise_error
+        @user1.deleted = true
+        lambda { @user1.status.save! }.should raise_error
+      end
     end
   end
 end
