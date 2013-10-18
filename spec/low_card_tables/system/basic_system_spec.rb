@@ -151,15 +151,47 @@ describe LowCardTables do
         user2_v2.deleted.should == true
       end
 
-      it "should allow validations on the low-card table that are enforced"
-      it "should allow the associated table to validate low-card data"
-      it "should gracefully handle database-level rejection of a new low-card row"
+      context "with basic validations" do
+        before :each do
+          class ::UserStatus
+            validates
+          end
+
+          class ::User
+            validates
+          end
+        end
+
+        it "should allow validations on the low-card table that are enforced"
+        it "should allow the associated table to validate low-card data"
+      end
+
+      it "should gracefully handle database-level rejection of a new low-card row" do
+        @user1.gender = nil
+        e = nil
+
+        begin
+          @user1.save!
+        rescue => x
+          e = x
+        end
+
+        e.should be
+        e.class.should == LowCardTables::Errors::LowCardInvalidLowCardRowsError
+        e.message.should match(/lctables_spec_user_statuses/mi)
+        e.message.should match(/gender/mi)
+        e.message.should match(/nil/mi)
+        e.message.should match(/ActiveRecord::StatementInvalid/mi)
+      end
 
       it "should handle schema changes to the low-card table"
       it "should be able to remove low-card columns and automatically update associated rows"
 
       it "should cache low-card rows in memory"
       it "should throw out the cache if the schema has changed"
+
+      it "should notify listeners when refreshing its cache"
+      it "should notify listeners when adding a new row"
     end
   end
 end

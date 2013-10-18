@@ -105,6 +105,23 @@ but we got back these values:
         end
       end
 
+      def could_not_create_new_rows!(exception, keys, failed_instances)
+        message = %{The low_card_tables gem was trying to create one or more new rows in
+the low-card table '#{@low_card_model.table_name}', but, when we went to create those rows,
+the database refused to create them. This is usually because one or more of these rows
+violates a database constraint -- like a NOT NULL or CHECK constraint.}
+
+        if failed_instances
+          message << "\n\nThe rows we tried to import, but couldn't, were:\n\nKeys: #{keys.inspect}\n\nValues:\n\n#{failed_instances.map(&:inspect).join("\n")}"
+        end
+
+        if exception
+          message << "\n\nThe exception we got was:\n  #{exception.class.name} #{exception.message}\n    #{exception.backtrace.join("\n    ")}"
+        end
+
+        raise LowCardTables::Errors::LowCardInvalidLowCardRowsError, message
+      end
+
       def flush_lock_and_create_ids_for!(hashes)
         with_locked_table do
           flush!
@@ -121,13 +138,14 @@ but we got back these values:
               keys.map { |k| hash[k] }
             end
 
-            import_result = @low_card_model.import(keys, values, :validate => true)
-            if import_result.failed_instances.length > 0
-              raise LowCardTables::Errors::LowCardError, %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
-but, when we tried to create them, we couldn't import these rows:
-
-#{import_result.failed_instances.join("\n")}}
+            import_result = nil
+            begin
+              import_result = @low_card_model.import(keys, values, :validate => true)
+            rescue ::ActiveRecord::StatementInvalid => si
+              could_not_create_new_rows!(si, keys, values)
             end
+
+            could_not_create_new_rows!(nil, keys, import_result.failed_instances) if import_result.failed_instances.length > 0
           end
 
           flush!
