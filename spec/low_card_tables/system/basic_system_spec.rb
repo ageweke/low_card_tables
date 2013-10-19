@@ -158,7 +158,7 @@ describe LowCardTables do
           end
 
           class ::User
-            # validates :donation_level, :numericality => { :greater_than_or_equal_to => 0, :less_than_or_equal_to => 10 }
+            validates :donation_level, :numericality => { :greater_than_or_equal_to => 0, :less_than_or_equal_to => 10 }
           end
         end
 
@@ -181,7 +181,21 @@ describe LowCardTables do
           e.message.should match(/amazing/mi)
         end
 
-        it "should allow the associated table to validate low-card data"
+        it "should allow the associated table to validate low-card data" do
+          @user1.donation_level = 40
+          e = nil
+
+          begin
+            @user1.save!
+          rescue => x
+            e = x
+          end
+
+          e.should be
+          e.class.should == ActiveRecord::RecordInvalid
+          e.message.should match(/donation level/mi)
+          e.message.should match(/less than or equal to 10/mi)
+        end
       end
 
       it "should gracefully handle database-level rejection of a new low-card row" do
@@ -210,6 +224,12 @@ describe LowCardTables do
 
       it "should notify listeners when refreshing its cache"
       it "should notify listeners when adding a new row"
+
+      it "should allow delegating no methods from the has_low_card_table class"
+      it "should allow delegating just some methods from the has_low_card_table class"
+
+      it "should allow specifying the target class manually"
+      it "should allow specifying the foreign key manually"
     end
   end
 end
