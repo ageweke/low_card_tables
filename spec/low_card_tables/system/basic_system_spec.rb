@@ -154,15 +154,33 @@ describe LowCardTables do
       context "with basic validations" do
         before :each do
           class ::UserStatus
-            validates
+            validates :gender, :inclusion => { :in => %w{male female other} }
           end
 
           class ::User
-            validates
+            # validates :donation_level, :numericality => { :greater_than_or_equal_to => 0, :less_than_or_equal_to => 10 }
           end
         end
 
-        it "should allow validations on the low-card table that are enforced"
+        it "should allow validations on the low-card table that are enforced" do
+          @user1.gender = 'amazing'
+          e = nil
+
+          begin
+            @user1.save!
+          rescue => x
+            e = x
+          end
+
+          e.should be
+          e.class.should == LowCardTables::Errors::LowCardInvalidLowCardRowsError
+          e.message.should match(/lctables_spec_user_statuses/mi)
+          e.message.should match(/validation/mi)
+          e.message.should match(/gender/mi)
+          e.message.should match(/gender is not included in the list/mi)
+          e.message.should match(/amazing/mi)
+        end
+
         it "should allow the associated table to validate low-card data"
       end
 

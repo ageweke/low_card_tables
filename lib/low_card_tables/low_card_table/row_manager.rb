@@ -107,16 +107,39 @@ but we got back these values:
 
       def could_not_create_new_rows!(exception, keys, failed_instances)
         message = %{The low_card_tables gem was trying to create one or more new rows in
-the low-card table '#{@low_card_model.table_name}', but, when we went to create those rows,
-the database refused to create them. This is usually because one or more of these rows
-violates a database constraint -- like a NOT NULL or CHECK constraint.}
+the low-card table '#{@low_card_model.table_name}', but, when we went to create those rows...
+
+}
+
 
         if failed_instances
-          message << "\n\nThe rows we tried to import, but couldn't, were:\n\nKeys: #{keys.inspect}\n\nValues:\n\n#{failed_instances.map(&:inspect).join("\n")}"
+          message << %{- They failed validation.
+
+Here's what we tried to import:
+
+  Keys: #{keys.inspect}
+  Values:
+
+}
+          failed_instances.each do |failed_instance|
+            line = "    #{failed_instance.inspect}"
+
+            if failed_instance.respond_to?(:errors)
+              line << "    ERRORS: #{failed_instance.errors.full_messages.join("; ")}"
+            end
+
+            message << "#{line}\n"
+          end
         end
 
         if exception
-          message << "\n\nThe exception we got was:\n  #{exception.class.name} #{exception.message}\n    #{exception.backtrace.join("\n    ")}"
+          message << %{- The database refused to create them. This is usually because one or more of these rows
+violates a database constraint -- like a NOT NULL or CHECK constraint.
+
+The exception we got was:
+
+(#{exception.class.name}) #{exception.message}
+    #{exception.backtrace.join("\n    ")}}
         end
 
         raise LowCardTables::Errors::LowCardInvalidLowCardRowsError, message
