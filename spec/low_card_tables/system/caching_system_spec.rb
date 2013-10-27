@@ -18,28 +18,28 @@ describe LowCardTables do
     drop_standard_system_spec_tables!
   end
 
+  def create_basic_user(name = 'User1')
+    out = ::User.new
+    out.name = 'User1'
+    out.deleted = false
+    out.deceased = false
+    out.gender = 'female'
+    out.donation_level = 3
+    out.save!
+
+    out
+  end
+
   it "should cache low-card rows in memory" do
     LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
       spy.call_count.should == 0
 
-      user1 = ::User.new
-      user1.name = 'User1'
-      user1.deleted = false
-      user1.deceased = false
-      user1.gender = 'female'
-      user1.donation_level = 3
-      user1.save!
+      user1 = create_basic_user
 
       mid_calls = spy.call_count
       mid_calls.should > 0
 
-      user2 = ::User.new
-      user2.name = 'User2'
-      user2.deleted = false
-      user2.deceased = false
-      user2.gender = 'female'
-      user2.donation_level = 3
-      user2.save!
+      user2 = create_basic_user('User2')
 
       spy.call_count.should == mid_calls
     end
@@ -49,13 +49,7 @@ describe LowCardTables do
     LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
       spy.call_count.should == 0
 
-      user1 = ::User.new
-      user1.name = 'User1'
-      user1.deleted = false
-      user1.deceased = false
-      user1.gender = 'female'
-      user1.donation_level = 3
-      user1.save!
+      user1 = create_basic_user
 
       mid_calls = spy.call_count
       mid_calls.should > 0
@@ -77,13 +71,7 @@ describe LowCardTables do
     LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
       spy.call_count.should == 0
 
-      user1 = ::User.new
-      user1.name = 'User1'
-      user1.deleted = false
-      user1.deceased = false
-      user1.gender = 'female'
-      user1.donation_level = 3
-      user1.save!
+      user1 = create_basic_user
 
       mid_calls = spy.call_count
       mid_calls.should > 0
@@ -117,13 +105,7 @@ describe LowCardTables do
     LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
       spy.call_count.should == 0
 
-      user1 = ::User.new
-      user1.name = 'User1'
-      user1.deleted = false
-      user1.deceased = false
-      user1.gender = 'female'
-      user1.donation_level = 3
-      user1.save!
+      user1 = create_basic_user
 
       mid_calls = spy.call_count
       mid_calls.should > 0
@@ -181,13 +163,7 @@ describe LowCardTables do
     it "should notify listeners when flushing and loading its cache" do
       @cache_listener.calls.length.should == 0
 
-      user1 = ::User.new
-      user1.name = 'User1'
-      user1.deleted = false
-      user1.deceased = false
-      user1.gender = 'female'
-      user1.donation_level = 3
-      user1.save!
+      user1 = create_basic_user
 
       call_count = @cache_listener.calls.length
       call_count.should > 0
@@ -222,13 +198,7 @@ describe LowCardTables do
     it "should notify listeners when adding a new row" do
       @cache_listener.calls.length.should == 0
 
-      user1 = ::User.new
-      user1.name = 'User1'
-      user1.deleted = false
-      user1.deceased = false
-      user1.gender = 'female'
-      user1.donation_level = 3
-      user1.save!
+      user1 = create_basic_user
 
       call_count = @cache_listener.calls.length
       call_count.should > 0
@@ -266,5 +236,96 @@ describe LowCardTables do
     end
   end
 
-  it "should use the specified cache policy"
+  context "cache policies" do
+    before :each do
+      class LowCardTables::LowCardTable::RowManager
+        def current_time
+          self.class.override_current_time || Time.now
+        end
+
+        class << self
+          def override_current_time=(x)
+            @override_current_time = x
+          end
+
+          def override_current_time
+            @override_current_time
+          end
+        end
+      end
+
+      class LowCardTables::LowCardTable::Cache
+        def current_time
+          LowCardTables::LowCardTable::RowManager.override_current_time || Time.now
+        end
+      end
+    end
+
+    def check_cache_expiration(cache_expiration_setting, &block)
+      LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
+        ::UserStatus.low_card_cache_expiration = cache_expiration_setting
+
+        @start_time = Time.now
+        user1 = create_basic_user
+
+        @last_call_count = spy.call_count
+        @spy = spy
+
+        block.call
+      end
+    end
+
+    def set_current_time(x)
+      LowCardTables::LowCardTable::RowManager.override_current_time = @start_time + x
+    end
+
+    def time_and_check(time, cached_or_not)
+      set_current_time(time)
+      new_user = create_basic_user
+
+      if cached_or_not == :cached
+        @spy.call_count.should == @last_call_count
+      elsif cached_or_not == :uncached
+        @spy.call_count.should > @last_call_count
+        @last_call_count = @spy.call_count
+      else
+        raise "Unknown cached_or_not: #{cached_or_not.inspect}"
+      end
+    end
+
+    it "should apply a fixed setting correctly" do
+      check_cache_expiration(2.minutes) do |spy, initial_call_count|
+        time_and_check(119.seconds, :cached)
+        time_and_check(121.seconds, :uncached)
+        time_and_check(240.seconds, :cached)
+        time_and_check(242.seconds, :uncached)
+      end
+    end
+
+    it "should apply a setting of 0 correctly" do
+      check_cache_expiration(0) do |spy, initial_call_count|
+        time_and_check(1.seconds, :uncached)
+        time_and_check(1.seconds, :uncached)
+        time_and_check(2.seconds, :uncached)
+        time_and_check(3.seconds, :uncached)
+        time_and_check(3.seconds, :uncached)
+      end
+    end
+
+    it "should apply a setting of :unlimited correctly" do
+      check_cache_expiration(:unlimited) do |spy, initial_call_count|
+        time_and_check(1.seconds, :cached)
+        time_and_check(2.seconds, :cached)
+        time_and_check(5.years, :cached)
+      end
+    end
+
+    it "should apply a setting of :exponential correctly" do
+      check_cache_expiration(:exponential) do |spy, initial_call_count|
+        time_and_check(1.seconds, :cached)
+        time_and_check(2.seconds, :cached)
+        time_and_check(5.years, :cached)
+      end
+    end
+  end
 end

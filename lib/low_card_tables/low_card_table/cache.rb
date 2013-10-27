@@ -92,7 +92,7 @@ module LowCardTables
         # We ask for one more than the number of rows we are willing to accept here; this is so that if we have
         # too many rows, we can detect it, but we still won't do something crazy like try to load one million
         # rows into memory.
-        read_rows_time = Time.now
+        read_rows_time = current_time
 
         raw_rows = @model_class.order("#{@model_class.primary_key} ASC").limit(max_row_count + 1).all
         raise_too_many_rows_error if raw_rows.length > max_row_count
@@ -106,6 +106,10 @@ module LowCardTables
 
         @rows_by_id = out
         @rows_read_at = read_rows_time
+      end
+
+      def current_time
+        Time.now
       end
 
       DEFAULT_MAX_ROW_COUNT = 5_000
