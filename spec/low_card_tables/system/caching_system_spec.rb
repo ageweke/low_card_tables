@@ -340,12 +340,43 @@ describe LowCardTables do
         # 180-190: ten second minimum
         time_and_check(181.seconds, :uncached)
         time_and_check(182.seconds, :cached)
-        time_and_check(190.seconds, :cached)
+        time_and_check(189.seconds, :cached)
 
         # 190-210: first doubling (20 seconds)
         time_and_check(191.seconds, :uncached)
         time_and_check(192.seconds, :cached)
         time_and_check(209.seconds, :cached)
+
+        # 210-250: second doubling (40 seconds)
+        # don't check here -- want to make sure we skip this properly
+
+        # 250-330: third doubling (80 seconds)
+        time_and_check(251.seconds, :uncached)
+        time_and_check(295.seconds, :cached)
+        time_and_check(329.seconds, :cached)
+
+        # 330-490: fourth doubling (160 seconds)
+        # 490-810: fifth doubling (320 seconds)
+        # 810-1450: sixth doubling (640 seconds)
+        # 1450-2730: seventh doubling (1280 seconds)
+        # 2730-5290: eighth doubling (2560 seconds)
+        time_and_check(2731.seconds, :uncached)
+        time_and_check(2732.seconds, :cached)
+        time_and_check(5289.seconds, :cached)
+
+        # 5290-8890: max (3600 seconds)
+        time_and_check(5291.seconds, :uncached)
+        time_and_check(5292.seconds, :cached)
+        time_and_check(8889.seconds, :cached)
+
+        # 8890-12490: max (3600 seconds)
+        time_and_check(8891.seconds, :uncached)
+        time_and_check(8892.seconds, :cached)
+        time_and_check(12489.seconds, :cached)
+
+        # 12490-16090: max (3600 seconds)
+        time_and_check(12491.seconds, :uncached)
+        time_and_check(16089.seconds, :cached)
       end
     end
   end
