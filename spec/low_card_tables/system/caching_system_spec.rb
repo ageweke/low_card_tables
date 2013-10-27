@@ -379,5 +379,41 @@ describe LowCardTables do
         time_and_check(16089.seconds, :cached)
       end
     end
+
+
+    it "should apply a setting of :exponential with custom settings correctly" do
+      check_cache_expiration(:exponential, :zero_floor_time => 10.seconds, :min_time => 5.seconds, :exponent => 3.0, :max_time => 200.seconds) do |spy, initial_call_count|
+        # 0-10: zero floor
+        time_and_check(0.seconds, :uncached)
+        time_and_check(1.seconds, :uncached)
+        time_and_check(9.seconds, :uncached)
+
+        # 10-15: five second minimum
+        time_and_check(10.seconds, :uncached)
+        time_and_check(14.seconds, :cached)
+
+        # 15-30: first tripling (15 seconds)
+        time_and_check(16.seconds, :uncached)
+        time_and_check(17.seconds, :cached)
+        time_and_check(29.seconds, :cached)
+
+        # 30-75: second tripling (45 seconds)
+        time_and_check(31.seconds, :uncached)
+        time_and_check(32.seconds, :cached)
+        time_and_check(74.seconds, :cached)
+
+        # 75-210: third tripling (135 seconds)
+
+        # 210-410: max (200 seconds)
+        time_and_check(211.seconds, :uncached)
+        time_and_check(212.seconds, :cached)
+        time_and_check(409.seconds, :cached)
+
+        # 410-610: max (200 seconds)
+        time_and_check(411.seconds, :uncached)
+        time_and_check(412.seconds, :cached)
+        time_and_check(609.seconds, :cached)
+      end
+    end
   end
 end
