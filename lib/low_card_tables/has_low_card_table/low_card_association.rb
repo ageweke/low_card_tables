@@ -61,6 +61,12 @@ module LowCardTables
         new_module.module_eval(%{
   def #{association_name}
     _low_card_objects_manager.object_for('#{association_name}')
+  end
+
+  def #{foreign_key_column_name}=(*args)
+    out = super(*args)
+    _low_card_objects_manager.invalidate_object_for('#{association_name}')
+    out
   end})
 
         low_card_class._low_card_value_column_names.each do |column_name|

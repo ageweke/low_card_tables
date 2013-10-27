@@ -14,6 +14,10 @@ module LowCardTables
         end
       end
 
+      def invalidate_object_for(association_name)
+        @objects.delete(association_name)
+      end
+
       private
       attr_reader :model_instance
     end

@@ -31,7 +31,7 @@ describe LowCardTables do
       add_column :lctables_spec_users, :old_user_status_id, :integer
     end
 
-    ::User.reset_column_information!
+    ::User.reset_column_information
     class ::User < ::ActiveRecord::Base
       has_low_card_table :old_status, :class_name => ::UserStatus, :foreign_key => :old_user_status_id
     end

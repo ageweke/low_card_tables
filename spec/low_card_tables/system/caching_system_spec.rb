@@ -12,8 +12,6 @@ describe LowCardTables do
 
     create_standard_system_spec_tables!
     create_standard_system_spec_models!
-
-    ::UserStatus.low_card_cache_expiration = :unlimited
   end
 
   after :each do
@@ -33,7 +31,7 @@ describe LowCardTables do
       user1.save!
 
       mid_calls = spy.call_count
-      spy.call_count.should > 0
+      mid_calls.should > 0
 
       user2 = ::User.new
       user2.name = 'User2'
@@ -60,7 +58,7 @@ describe LowCardTables do
       user1.save!
 
       mid_calls = spy.call_count
-      spy.call_count.should > 0
+      mid_calls.should > 0
 
       user2 = ::User.new
       user2.name = 'User2'
@@ -75,6 +73,78 @@ describe LowCardTables do
     end
   end
 
+  it "should handle the situation where a row in the database has a low-card ID that's not in cache" do
+    LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
+      spy.call_count.should == 0
+
+      user1 = ::User.new
+      user1.name = 'User1'
+      user1.deleted = false
+      user1.deceased = false
+      user1.gender = 'female'
+      user1.donation_level = 3
+      user1.save!
+
+      mid_calls = spy.call_count
+      mid_calls.should > 0
+
+      new_status = ::UserStatusBackdoor.new
+      new_status.deleted = false
+      new_status.deceased = false
+      new_status.gender = 'male'
+      new_status.donation_level = 7
+      new_status.save!
+
+      old_status_id = user1.user_status_id
+      ::User.update_all([ "user_status_id = :new_status_id", { :new_status_id => new_status.id } ], [ "id = :id", { :id => user1.id } ])
+      user1.user_status_id.should == old_status_id # make sure we didn't touch the existing object
+
+      # Make sure we didn't somehow invalidate the cache before this
+      spy.call_count.should == mid_calls
+
+      user2 = ::User.find(user1.id)
+      user2.deleted.should == false
+      user2.deceased.should == false
+      user2.gender.should == 'male'
+      user2.donation_level.should == 7
+
+      (spy.call_count - mid_calls).should > 0
+      (spy.call_count - mid_calls).should <= 2
+    end
+  end
+
+  it "should be OK with manually-assigning an ID that's not in cache (that you somehow got out-of-band)" do
+    LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
+      spy.call_count.should == 0
+
+      user1 = ::User.new
+      user1.name = 'User1'
+      user1.deleted = false
+      user1.deceased = false
+      user1.gender = 'female'
+      user1.donation_level = 3
+      user1.save!
+
+      mid_calls = spy.call_count
+      mid_calls.should > 0
+
+      new_status = ::UserStatusBackdoor.new
+      new_status.deleted = false
+      new_status.deceased = false
+      new_status.gender = 'male'
+      new_status.donation_level = 7
+      new_status.save!
+
+      user1.user_status_id = new_status.id
+      user1.deleted.should == false
+      user1.deceased.should == false
+      user1.gender.should == 'male'
+      user1.donation_level.should == 7
+
+      (spy.call_count - mid_calls).should > 0
+      (spy.call_count - mid_calls).should <= 2
+    end
+  end
   it "should notify listeners when refreshing its cache"
   it "should notify listeners when adding a new row"
 
