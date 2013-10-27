@@ -15,7 +15,7 @@ module LowCardTables
               LowCardTables::LowCardTable::CacheExpiration::FixedCacheExpirationPolicy.new(type_or_number)
             elsif type_or_number == :unlimited
               @_low_card_cache_expiration_return_value = :unlimited
-              LowCardTables::LowCardTable::CacheExpiration::UnlimitedCacheExpirationPolicy.new(type_or_number)
+              LowCardTables::LowCardTable::CacheExpiration::UnlimitedCacheExpirationPolicy.new
             elsif type_or_number == :exponential
               @_low_card_cache_expiration_return_value = [ :exponential, :options ]
               LowCardTables::LowCardTable::CacheExpiration::ExponentialCacheExpirationPolicy.new(options)
