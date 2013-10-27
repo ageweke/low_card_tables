@@ -112,15 +112,26 @@ the low-card table '#{@low_card_model.table_name}', but, when we went to create 
 }
 
 
-        if failed_instances
-          message << %{- They failed validation.
+        if exception
+          message << %{- The database refused to create them. This is usually because one or more of these rows
+violates a database constraint -- like a NOT NULL or CHECK constraint.
 
-Here's what we tried to import:
+The exception we got was:
+
+(#{exception.class.name}) #{exception.message}
+    #{exception.backtrace.join("\n    ")}}
+        elsif failed_instances
+          message << "- They failed validation."
+        end
+
+        if failed_instances.length > 0
+          message << %{Here's what we tried to import:
 
   Keys: #{keys.inspect}
   Values:
 
 }
+
           failed_instances.each do |failed_instance|
             line = "    #{failed_instance.inspect}"
 
@@ -130,16 +141,6 @@ Here's what we tried to import:
 
             message << "#{line}\n"
           end
-        end
-
-        if exception
-          message << %{- The database refused to create them. This is usually because one or more of these rows
-violates a database constraint -- like a NOT NULL or CHECK constraint.
-
-The exception we got was:
-
-(#{exception.class.name}) #{exception.message}
-    #{exception.backtrace.join("\n    ")}}
         end
 
         raise LowCardTables::Errors::LowCardInvalidLowCardRowsError, message

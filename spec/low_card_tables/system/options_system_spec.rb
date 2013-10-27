@@ -20,6 +20,22 @@ describe LowCardTables do
   it "should allow delegating no methods from the has_low_card_table class"
   it "should allow delegating just some methods from the has_low_card_table class"
 
+  it "should allow prefixing delegated methods with the association name easily"
+  it "should allow prefixing delegated methods with any arbitrary string"
+
   it "should allow specifying the target class manually"
   it "should allow specifying the foreign key manually"
+
+  it "should allow multiple references from a table to the same low-card table" do
+    migrate do
+      add_column :lctables_spec_users, :old_user_status_id, :integer
+    end
+
+    ::User.reset_column_information!
+    class ::User < ::ActiveRecord::Base
+      has_low_card_table :old_status, :class_name => ::UserStatus, :foreign_key => :old_user_status_id
+    end
+
+    raise "pending"
+  end
 end

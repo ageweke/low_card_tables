@@ -8,24 +8,13 @@ describe LowCardTables do
   before :each do
     @dh = LowCardTables::Helpers::DatabaseHelper.new
     @dh.setup_activerecord!
-
-    create_standard_system_spec_tables!
-    create_standard_system_spec_models!
   end
 
-  after :each do
-    drop_standard_system_spec_tables!
-  end
-
-  it "should say #is_low_card_table? appropriately" do
-    ::UserStatus.is_low_card_table?.should be
-    ::User.is_low_card_table?.should_not be
-
-    ::UserStatus.low_card_options.should == { }
-  end
-
-  context "with a trivial setup" do
+  context "with standard setup" do
     before :each do
+      create_standard_system_spec_tables!
+      create_standard_system_spec_models!
+
       @user1 = ::User.new
       @user1.name = 'User1'
       @user1.deleted = false
@@ -33,6 +22,17 @@ describe LowCardTables do
       @user1.gender = 'female'
       @user1.donation_level = 3
       @user1.save!
+    end
+
+    after :each do
+      drop_standard_system_spec_tables!
+    end
+
+    it "should say #is_low_card_table? appropriately" do
+      ::UserStatus.is_low_card_table?.should be
+      ::User.is_low_card_table?.should_not be
+
+      ::UserStatus.low_card_options.should == { }
     end
 
     it "should allow setting all options, and create an appropriate row" do
@@ -112,9 +112,58 @@ describe LowCardTables do
       user1_v2.deleted.should == false
       user2_v2.deleted.should == true
     end
+  end
 
-    it "should allow multiple references from a table to the same low-card table"
+  it "should handle column default values in exactly the same way as ActiveRecord" do
+    migrate do
+      drop_table :lctables_spec_user_statuses rescue nil
+      create_table :lctables_spec_user_statuses do |t|
+        t.boolean :deleted, :null => false
+        t.boolean :deceased, :default => false
+        t.string :gender, :default => 'unknown'
+        t.integer :donation_level, :default => 5
+      end
 
-    it "should handle column default values in exactly the same way as ActiveRecord"
+      add_index :lctables_spec_user_statuses, [ :deleted, :deceased, :gender, :donation_level ], :unique => true, :name => 'index_lctables_spec_user_statuses_on_all'
+
+      drop_table :lctables_spec_users rescue nil
+      create_table :lctables_spec_users do |t|
+        t.string :name, :null => false
+        t.integer :user_status_id, :null => false, :limit => 2
+      end
+    end
+
+    create_standard_system_spec_models!
+
+    user = ::User.new
+    user.name = 'Name1'
+    user.deleted.should == nil
+    user.deceased.should == false
+    user.gender.should == 'unknown'
+    user.donation_level.should == 5
+
+    lambda { user.save! }.should raise_error(LowCardTables::Errors::LowCardInvalidLowCardRowsError)
+    user.deleted = false
+    user.save!
+
+    user.deleted.should == false
+    user.deceased.should == false
+    user.gender.should == 'unknown'
+    user.donation_level.should == 5
+
+    user2 = ::User.find(user.id)
+    user2.name.should == 'Name1'
+    user2.deleted.should == false
+    user2.deceased.should == false
+    user2.gender.should == 'unknown'
+    user2.donation_level.should == 5
+
+    rows = ::UserStatusBackdoor.all
+    rows.length.should == 1
+    row = rows[0]
+    row.deleted.should == false
+    row.deceased.should == false
+    row.gender.should == 'unknown'
+    row.donation_level.should == 5
   end
 end

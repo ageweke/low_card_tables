@@ -21,4 +21,6 @@ describe LowCardTables do
 
   it "should notify listeners when refreshing its cache"
   it "should notify listeners when adding a new row"
+
+  it "should use the specified cache policy"
 end
