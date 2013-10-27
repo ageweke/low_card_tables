@@ -216,6 +216,8 @@ describe LowCardTables do
         e.message.should match(/ActiveRecord::StatementInvalid/mi)
       end
 
+      it "should allow multiple references from a table to the same low-card table"
+
       it "should handle schema changes to the low-card table"
       it "should be able to remove low-card columns and automatically update associated rows"
 
@@ -230,6 +232,17 @@ describe LowCardTables do
 
       it "should allow specifying the target class manually"
       it "should allow specifying the foreign key manually"
+
+      it "should allow 'where' clauses to behave naturally"
+      it "should compose 'where' clauses correctly"
+
+      it "should allow using low-card properties in the default scope"
+      it "should allow using low-card properties in arbitrary scopes"
+      it "should pick up new low-card rows when using a low-card property in an arbitrary scope"
+
+      it "should automatically add a unique index in migrations"
+      it "should allow removing a column, and thus collapsing rows that are now identical"
+      it "should fail if there is no unique index on a low-card table at startup"
     end
   end
 end
