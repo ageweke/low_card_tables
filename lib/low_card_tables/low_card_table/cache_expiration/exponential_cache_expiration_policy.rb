@@ -19,7 +19,9 @@ module LowCardTables
         end
 
         def stale?(cache_time, current_time)
-          (current_time - cache_time) > current_expiration_time(current_time)
+          current_expiration = current_expiration_time(current_time)
+          $stderr.puts "stale? current_time #{current_time}, cache_time #{cache_time}, diff #{current_time - cache_time}, current_expiration #{current_expiration}"
+          (current_time - cache_time) >= current_expiration
         end
 
         private
@@ -47,7 +49,11 @@ module LowCardTables
         end
 
         def base_time
-          @base_time ||= Time.now
+          @base_time ||= current_time
+        end
+
+        def current_time
+          Time.now
         end
       end
     end

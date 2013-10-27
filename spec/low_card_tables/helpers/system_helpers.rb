@@ -43,7 +43,7 @@ module LowCardTables
         define_model_class(:User, 'lctables_spec_users') { has_low_card_table :status }
         define_model_class(:UserStatusBackdoor, 'lctables_spec_user_statuses') { }
 
-        ::UserStatus.low_card_cache_expiration = :unlimited
+        ::UserStatus.low_card_cache_expiration :unlimited
       end
 
       def drop_standard_system_spec_tables!

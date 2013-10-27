@@ -259,13 +259,21 @@ describe LowCardTables do
           LowCardTables::LowCardTable::RowManager.override_current_time || Time.now
         end
       end
+
+      class LowCardTables::LowCardTable::CacheExpiration::ExponentialCacheExpirationPolicy
+        def current_time
+          LowCardTables::LowCardTable::RowManager.override_current_time || Time.now
+        end
+      end
     end
 
-    def check_cache_expiration(cache_expiration_setting, &block)
+    def check_cache_expiration(*cache_expiration_settings, &block)
       LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
-        ::UserStatus.low_card_cache_expiration = cache_expiration_setting
-
         @start_time = Time.now
+        set_current_time(0)
+
+        ::UserStatus.low_card_cache_expiration *cache_expiration_settings
+
         user1 = create_basic_user
 
         @last_call_count = spy.call_count
@@ -320,11 +328,24 @@ describe LowCardTables do
       end
     end
 
-    it "should apply a setting of :exponential correctly" do
+    it "should apply a setting of :exponential with default settings correctly" do
       check_cache_expiration(:exponential) do |spy, initial_call_count|
-        time_and_check(1.seconds, :cached)
-        time_and_check(2.seconds, :cached)
-        time_and_check(5.years, :cached)
+        # 0-180: zero floor
+        time_and_check(0.seconds, :uncached)
+        time_and_check(1.seconds, :uncached)
+        time_and_check(30.seconds, :uncached)
+        time_and_check(90.seconds, :uncached)
+        time_and_check(179.seconds, :uncached)
+
+        # 180-190: ten second minimum
+        time_and_check(181.seconds, :uncached)
+        time_and_check(182.seconds, :cached)
+        time_and_check(190.seconds, :cached)
+
+        # 190-210: first doubling (20 seconds)
+        time_and_check(191.seconds, :uncached)
+        time_and_check(192.seconds, :cached)
+        time_and_check(209.seconds, :cached)
       end
     end
   end
