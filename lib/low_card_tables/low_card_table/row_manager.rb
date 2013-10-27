@@ -17,7 +17,7 @@ module LowCardTables
         begin
           cache.rows_for_ids(id_or_ids)
         rescue LowCardTables::Errors::LowCardIdNotFoundError => lcinfe
-          flush!
+          flush!(:id_not_found, :ids => lcinfe.ids)
           cache.rows_for_ids(id_or_ids)
         end
       end
@@ -56,7 +56,7 @@ module LowCardTables
         begin
           cache.send(method_name, hash_or_hashes, &block)
         rescue LowCardTables::Errors::LowCardColumnNotPresentError => lccnpe
-          flush!
+          flush!(:schema_change)
           cache.send(method_name, hash_or_hashes, &block)
         end
       end
@@ -148,7 +148,7 @@ The exception we got was:
 
       def flush_lock_and_create_ids_for!(hashes)
         with_locked_table do
-          flush!
+          flush!(:creating_rows, :context => :before_import, :new_rows => hashes)
 
           # because it's possible there was a schema modification that we just now picked up
           hashes.each { |hash| assert_complete_key!(hash) }
@@ -164,7 +164,9 @@ The exception we got was:
 
             import_result = nil
             begin
-              import_result = @low_card_model.import(keys, values, :validate => true)
+              instrument('rows_created', :keys => keys, :values => values) do
+                import_result = @low_card_model.import(keys, values, :validate => true)
+              end
             rescue ::ActiveRecord::StatementInvalid => si
               could_not_create_new_rows!(si, keys, values)
             end
@@ -172,7 +174,7 @@ The exception we got was:
             could_not_create_new_rows!(nil, keys, import_result.failed_instances) if import_result.failed_instances.length > 0
           end
 
-          flush!
+          flush!(:creating_rows, :context => :after_import, :new_rows => hashes)
 
           existing = ids_matching(hashes)
           still_not_found = hashes - existing.keys
@@ -271,15 +273,34 @@ equivalent of 'LOCK TABLE'(s) in your database.}
       end
 
       def cache
-        @cache = nil if @cache && cache_expiration_policy_object.stale?(@cache.loaded_at, current_time)
-        @cache ||= LowCardTables::LowCardTable::Cache.new(@low_card_model, @low_card_model.low_card_options)
+        if @cache && cache_expiration_policy_object.stale?(@cache.loaded_at, current_time)
+          flush!(:stale, :loaded => @cache.loaded_at, :now => current_time)
+          @cache = nil
+        end
+
+        unless @cache
+          instrument('cache_load') do
+            @cache = LowCardTables::LowCardTable::Cache.new(@low_card_model, @low_card_model.low_card_options)
+          end
+        end
+
+        @cache
       end
 
-      def flush!
-        @cache = nil
-        @value_columns = nil
-        @value_column_names = nil
+      def flush!(reason, notification_options = { })
+        if @cache
+          instrument('cache_flush', notification_options.merge(:reason => reason)) do
+            @cache = nil
+            @value_columns = nil
+            @value_column_names = nil
+          end
+        end
+
         @low_card_model.reset_column_information
+      end
+
+      def instrument(event, options = { }, &block)
+        ::ActiveSupport::Notifications.instrument("low_card_tables.#{event}", options.merge(:low_card_model => @low_card_model), &block)
       end
 
       def cache_expiration_policy_object

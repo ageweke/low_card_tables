@@ -5,7 +5,14 @@ module LowCardTables
     class LowCardColumnError < LowCardError; end
     class LowCardColumnNotPresentError < LowCardColumnError; end
     class LowCardColumnNotSpecifiedError < LowCardColumnError; end
-    class LowCardIdNotFoundError < LowCardError; end
+    class LowCardIdNotFoundError < LowCardError
+      def initialize(message, ids)
+        super(message)
+        @ids = ids
+      end
+
+      attr_reader :ids
+    end
 
     class LowCardAssociationError < LowCardError; end
     class LowCardAssociationAlreadyExistsError < LowCardAssociationError; end

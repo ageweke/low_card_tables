@@ -44,7 +44,7 @@ module LowCardTables
         end
 
         unless missing_ids.length == 0
-          raise LowCardTables::Errors::LowCardIdNotFoundError, "Can't find IDs for low-card table #{@model_class.table_name}: #{missing_ids.join(", ")}"
+          raise LowCardTables::Errors::LowCardIdNotFoundError.new("Can't find IDs for low-card table #{@model_class.table_name}: #{missing_ids.join(", ")}", missing_ids)
         end
 
         if id_or_ids.kind_of?(Array)

@@ -145,8 +145,126 @@ describe LowCardTables do
       (spy.call_count - mid_calls).should <= 2
     end
   end
-  it "should notify listeners when refreshing its cache"
-  it "should notify listeners when adding a new row"
+
+  context "with a cache listener" do
+    before :each do
+      class CacheListener
+        def initialize
+          @calls = [ ]
+        end
+
+        def call(name, started, finished, unique_id, data)
+          @calls << { :name => name, :started => started, :finished => finished, :unique_id => unique_id, :data => data }
+        end
+
+        def listen!(*event_names)
+          event_names.each do |event_name|
+            ActiveSupport::Notifications.subscribe(event_name, self)
+          end
+        end
+
+        def unlisten!
+          ActiveSupport::Notifications.unsubscribe(self)
+        end
+
+        attr_reader :calls
+      end
+
+      @cache_listener = CacheListener.new
+      @cache_listener.listen!('low_card_tables.cache_load', 'low_card_tables.cache_flush', 'low_card_tables.rows_created')
+    end
+
+    after :each do
+      @cache_listener.unlisten!
+    end
+
+    it "should notify listeners when flushing and loading its cache" do
+      @cache_listener.calls.length.should == 0
+
+      user1 = ::User.new
+      user1.name = 'User1'
+      user1.deleted = false
+      user1.deceased = false
+      user1.gender = 'female'
+      user1.donation_level = 3
+      user1.save!
+
+      call_count = @cache_listener.calls.length
+      call_count.should > 0
+      @cache_listener.calls.detect { |c| c[:name] == 'low_card_tables.cache_load' }.should be
+
+      start_time = Time.now
+      user1.deleted = true
+      user1.save!
+      end_time = Time.now
+
+      new_calls = @cache_listener.calls[call_count..-1]
+      new_calls.length.should > 0
+
+      flush_event = new_calls.detect { |c| c[:name] == 'low_card_tables.cache_flush' }
+      load_event = new_calls.detect { |c| c[:name] == 'low_card_tables.cache_load' }
+      flush_event.should be
+      load_event.should be
+
+      flush_event[:started].should >= start_time
+      flush_event[:finished].should >= flush_event[:started]
+      flush_event[:finished].should <= end_time
+      flush_event[:data][:reason].should == :creating_rows
+      flush_event[:data][:low_card_model].should == ::UserStatus
+
+      load_event[:started].should >= start_time
+      load_event[:started].should >= flush_event[:finished]
+      load_event[:finished].should >= load_event[:started]
+      load_event[:finished].should <= end_time
+      load_event[:data][:low_card_model].should == ::UserStatus
+    end
+
+    it "should notify listeners when adding a new row" do
+      @cache_listener.calls.length.should == 0
+
+      user1 = ::User.new
+      user1.name = 'User1'
+      user1.deleted = false
+      user1.deceased = false
+      user1.gender = 'female'
+      user1.donation_level = 3
+      user1.save!
+
+      call_count = @cache_listener.calls.length
+      call_count.should > 0
+
+      start_time = Time.now
+      user1.gender = 'male'
+      user1.donation_level = 9
+      user1.save!
+      end_time = Time.now
+
+      new_calls = @cache_listener.calls[call_count..-1]
+      new_calls.length.should > 0
+
+      create_calls = new_calls.select { |c| c[:name] == 'low_card_tables.rows_created' }
+      create_calls.length.should == 1
+      create_call = create_calls[0]
+
+      create_call[:started].should >= start_time
+      create_call[:finished].should <= end_time
+      create_call[:finished].should >= create_call[:started]
+      create_call[:data][:low_card_model].should == ::UserStatus
+
+      keys = create_call[:data][:keys].map(&:to_s)
+      keys.sort.should == %w{deceased deleted donation_level gender}
+
+      values_array = create_call[:data][:values]
+      values_array.length.should == 1
+      values = values_array[0]
+      values.length.should == keys.length
+
+      values[keys.index('deceased')].should == false
+      values[keys.index('deleted')].should == false
+      values[keys.index('gender')].should == 'male'
+      values[keys.index('donation_level')].should == 9
+    end
+  end
 
   it "should use the specified cache policy"
 end
