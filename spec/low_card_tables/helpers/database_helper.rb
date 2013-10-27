@@ -1,3 +1,5 @@
+require 'active_record'
+
 module LowCardTables
   module Helpers
     class DatabaseHelper

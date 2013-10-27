@@ -1,3 +1,6 @@
+require 'active_record'
+require 'active_record/migration'
+
 module LowCardTables
   module Helpers
     module SystemHelpers
