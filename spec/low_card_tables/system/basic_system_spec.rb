@@ -113,34 +113,7 @@ describe LowCardTables do
       user2_v2.deleted.should == true
     end
 
-
     it "should allow multiple references from a table to the same low-card table"
-
-    it "should handle schema changes to the low-card table"
-    it "should be able to remove low-card columns and automatically update associated rows"
-
-    it "should cache low-card rows in memory"
-    it "should throw out the cache if the schema has changed"
-
-    it "should notify listeners when refreshing its cache"
-    it "should notify listeners when adding a new row"
-
-    it "should allow delegating no methods from the has_low_card_table class"
-    it "should allow delegating just some methods from the has_low_card_table class"
-
-    it "should allow specifying the target class manually"
-    it "should allow specifying the foreign key manually"
-
-    it "should allow 'where' clauses to behave naturally"
-    it "should compose 'where' clauses correctly"
-
-    it "should allow using low-card properties in the default scope"
-    it "should allow using low-card properties in arbitrary scopes"
-    it "should pick up new low-card rows when using a low-card property in an arbitrary scope"
-
-    it "should automatically add a unique index in migrations"
-    it "should allow removing a column, and thus collapsing rows that are now identical"
-    it "should fail if there is no unique index on a low-card table at startup"
 
     it "should handle column default values in exactly the same way as ActiveRecord"
   end

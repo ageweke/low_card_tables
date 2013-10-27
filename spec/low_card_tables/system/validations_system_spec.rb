@@ -83,7 +83,6 @@ describe LowCardTables do
     e.message.should match(/lctables_spec_user_statuses/mi)
     e.message.should match(/gender/mi)
     e.message.should match(/nil/mi)
-    $stderr.puts "\n\n\nMESSAGE:\n#{e.message}\n\n\n"
     e.message.should match(/ActiveRecord::StatementInvalid/mi)
   end
 end
