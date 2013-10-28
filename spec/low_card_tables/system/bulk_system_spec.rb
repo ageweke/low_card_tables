@@ -123,34 +123,6 @@ describe LowCardTables do
       end
     end
 
-    it "should allow for bulk retrieval of rows with exact matches" do
-      ensure_zero_database_calls do
-        results = ::UserStatus.low_card_find_rows_for([ @hash1, @hash2, @hash3, @hash4, @hash5 ])
-        results.size.should == 3
-
-        verify_row(results[@hash1], false, false, 'male', 5)
-        verify_row(results[@hash2], true, false, 'male', 5)
-        verify_row(results[@hash3], false, false, 'female', 9)
-
-        results[@hash4].should_not be
-        results[@hash5].should_not be
-      end
-    end
-
-    it "should allow for bulk retrieval of IDs with exact matches" do
-      ensure_zero_database_calls do
-        results = ::UserStatus.low_card_find_ids_for([ @hash1, @hash2, @hash3, @hash4, @hash5 ])
-        results.size.should == 3
-
-        results[@hash1].should == @hash1_id
-        results[@hash2].should == @hash2_id
-        results[@hash3].should == @hash3_id
-
-        results[@hash4].should_not be
-        results[@hash5].should_not be
-      end
-    end
-
     it "should raise an exception if there are missing values in the hashes" do
       ensure_zero_database_calls do
         lambda { ::UserStatus.low_card_find_rows_for([ { :deleted => false, :gender => 'male', :donation_level => 5 }]) }.should raise_error(LowCardTables::Errors::LowCardColumnNotSpecifiedError)
@@ -204,13 +176,16 @@ describe LowCardTables do
     end
 
     %w{hash object}.each do |input_type|
-      it "should allow for bulk retrieval-and-creation of rows by #{input_type}" do
-        hashes = [ @hash1, @hash3, @hash4, @hash5 ]
-        input = case input_type
+      def to_desired_input_type(hashes, type)
+        case type
         when 'hash' then hashes
         when 'object' then hashes.map { |h| ::UserStatus.new(h) }
         else raise "Unknown input_type: #{input_type.inspect}"
         end
+      end
+
+      it "should allow for bulk retrieval-and-creation of rows by #{input_type}" do
+        input = to_desired_input_type([ @hash1, @hash3, @hash4, @hash5 ], input_type)
 
         result = ::UserStatus.low_card_find_or_create_rows_for(input)
         result.size.should == 4
@@ -231,6 +206,56 @@ describe LowCardTables do
         verify_row(::UserStatusBackdoor.find(result[input[1]].id), false, false, 'female', 9)
         verify_row(::UserStatusBackdoor.find(result[input[2]].id), false, true, 'female', 3)
         verify_row(::UserStatusBackdoor.find(result[input[3]].id), false, true, 'male', 2)
+      end
+
+      it "should allow for bulk retrieval-and-creation of IDs by #{input_type}" do
+        input = to_desired_input_type([ @hash1, @hash3, @hash4, @hash5 ], input_type)
+
+        result = ::UserStatus.low_card_find_or_create_ids_for(input)
+        result.size.should == 4
+
+        result[input[0]].should == @hash1_id
+        result[@hash2].should be_nil
+        result[input[1]].should == @hash3_id
+
+        known_ids = [ @hash1_id, @hash2_id, @hash3_id ]
+        known_ids.include?(result[input[2]]).should_not be
+        known_ids.include?(result[input[3]]).should_not be
+
+        ::UserStatusBackdoor.count.should == 5
+        verify_row(::UserStatusBackdoor.find(result[input[0]]), false, false, 'male', 5)
+        verify_row(::UserStatusBackdoor.find(result[input[1]]), false, false, 'female', 9)
+        verify_row(::UserStatusBackdoor.find(result[input[2]]), false, true, 'female', 3)
+        verify_row(::UserStatusBackdoor.find(result[input[3]]), false, true, 'male', 2)
+      end
+
+      it "should allow for bulk retrieval of rows with exact matches by #{input_type}" do
+        ensure_zero_database_calls do
+          results = ::UserStatus.low_card_find_rows_for([ @hash1, @hash2, @hash3, @hash4, @hash5 ])
+          results.size.should == 3
+
+          verify_row(results[@hash1], false, false, 'male', 5)
+          verify_row(results[@hash2], true, false, 'male', 5)
+          verify_row(results[@hash3], false, false, 'female', 9)
+
+          results[@hash4].should_not be
+          results[@hash5].should_not be
+        end
+      end
+
+      it "should allow for bulk retrieval of IDs with exact matches by #{input_type}" do
+        ensure_zero_database_calls do
+          input = to_desired_input_type([ @hash1, @hash2, @hash3, @hash4, @hash5 ], input_type)
+          results = ::UserStatus.low_card_find_ids_for(input)
+          results.size.should == 3
+
+          results[input[0]].should == @hash1_id
+          results[input[1]].should == @hash2_id
+          results[input[2]].should == @hash3_id
+
+          results[input[3]].should_not be
+          results[input[4]].should_not be
+        end
       end
     end
   end
