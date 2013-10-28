@@ -87,13 +87,16 @@ module LowCardTables
       end
 
       def do_find_or_create(hash_hashes_object_or_objects, do_create)
-        hashes = to_array_of_complete_hashes(hash_hashes_object_or_objects)
+        input_to_complete_hash_map = map_input_to_complete_hashes(hash_hashes_object_or_objects)
+        complete_hash_to_input_map = input_to_complete_hash_map.invert
 
-        existing = rows_matching(hashes)
-        still_not_found = hashes - existing.keys
+        complete_hashes = input_to_complete_hash_map.values
+
+        existing = rows_matching(complete_hashes)
+        still_not_found = complete_hashes - existing.keys
 
         if still_not_found.length > 0 && do_create
-          existing = flush_lock_and_create_rows_for!(hashes)
+          existing = flush_lock_and_create_rows_for!(complete_hashes)
         end
 
         out = { }
@@ -107,13 +110,14 @@ but we got back these rows:
 #{values.inspect}}
           end
 
-          out[key] = values[0]
+          input = complete_hash_to_input_map[key]
+          out[input] = values[0]
         end
 
         if hash_hashes_object_or_objects.kind_of?(Array)
           out
         else
-          out[hash_hashes_object_or_objects]
+          out[out.keys.first]
         end
       end
 
@@ -174,8 +178,9 @@ The exception we got was:
         with_locked_table do
           flush!(:creating_rows, :context => :before_import, :new_rows => hashes)
 
-          # because it's possible there was a schema modification that we just now picked up
-          to_array_of_complete_hashes(hashes)
+          # because it's possible there was a schema modification that we just now picked up -- we're just using this
+          # for validation, so that it'll blow up if any of these are now no longer complete hashes
+          map_input_to_complete_hashes(hashes)
 
           existing = rows_matching(hashes)
           still_not_found = hashes - existing.keys
@@ -273,19 +278,39 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         end
       end
 
-      def to_array_of_complete_hashes(array)
-        array = if array.kind_of?(Array) then array else [ array ] end
-        array.map do |hash_or_object|
-          out = if hash_or_object.kind_of?(ActiveRecord::Base)
-            attributes = hash_or_object.attributes.dup
-            attributes.delete(@low_card_model.primary_key)
-            attributes
+      # Given something that can be a single Hash, an array of Hashes, a single instance of the @low_card_model class,
+      # or an array of instances of the @low_card_model class, returns a new Hash.
+      #
+      # This new Hash has, as keys, each of the inputs to this method, and, as values, a Hash for that input that is
+      # a complete, normalized Hash representing that input.
+      #
+      # This method will also raise an exception if any of the inputs do not include all of the necessary keys for the
+      # low-card table -- thus, this method can only be used for methods like #find_rows_for or #find_or_create_ids_for,
+      # where the input must each specify exactly one low-card row, rather than methods like
+      # #rows_matching/#ids_matching, where each input may match multiple low-card rows.
+      def map_input_to_complete_hashes(hash_hashes_object_or_objects)
+        # We can't use Array(), because that will turn a single Hash into an Array, and we definitely don't want
+        # to do that here!
+        as_array = if hash_hashes_object_or_objects.kind_of?(Array) then hash_hashes_object_or_objects else [ hash_hashes_object_or_objects ] end
+
+        out = { }
+        as_array.uniq.each do |hash_or_object|
+          hash = nil
+
+          if hash_or_object.kind_of?(Hash)
+            hash = hash_or_object.with_indifferent_access
+          elsif hash_or_object.kind_of?(@low_card_model)
+            hash = hash_or_object.attributes.dup.with_indifferent_access
+            hash.delete(@low_card_model.primary_key)
           else
-            hash_or_object.with_indifferent_access
+            raise "Invalid input to this method -- this must be a Hash, or an instance of #{@low_card_model}: #{hash_or_object.inspect}"
           end
-          assert_complete_key!(out)
-          out
+
+          assert_complete_key!(hash)
+          out[hash_or_object] = hash
         end
+
+        out
       end
 
       def assert_complete_key!(hash)

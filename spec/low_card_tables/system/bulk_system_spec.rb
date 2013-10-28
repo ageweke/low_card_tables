@@ -227,10 +227,10 @@ describe LowCardTables do
         verify_row(result[input[3]], false, true, 'male', 2)
 
         ::UserStatusBackdoor.count.should == 5
-        verify_row(::UserStatusBackdoor.find(result[@hash1].id), false, false, 'male', 5)
-        verify_row(::UserStatusBackdoor.find(result[@hash3].id), false, false, 'female', 9)
-        verify_row(::UserStatusBackdoor.find(result[@hash4].id), false, true, 'female', 3)
-        verify_row(::UserStatusBackdoor.find(result[@hash5].id), false, true, 'male', 2)
+        verify_row(::UserStatusBackdoor.find(result[input[0]].id), false, false, 'male', 5)
+        verify_row(::UserStatusBackdoor.find(result[input[1]].id), false, false, 'female', 9)
+        verify_row(::UserStatusBackdoor.find(result[input[2]].id), false, true, 'female', 3)
+        verify_row(::UserStatusBackdoor.find(result[input[3]].id), false, true, 'male', 2)
       end
     end
   end
