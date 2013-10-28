@@ -69,10 +69,11 @@ module LowCardTables
           out = { }
 
           @rows_by_id.each do |id,r|
-            matching_hash = r._low_card_row_matches_any_hash?(hashes)
-            if matching_hash
-              out[matching_hash] ||= [ ]
-              out[matching_hash] << r
+            hashes.each do |h|
+              if r._low_card_row_matches_any_hash?([ h ])
+                out[h] ||= [ ]
+                out[h] << r
+              end
             end
           end
 

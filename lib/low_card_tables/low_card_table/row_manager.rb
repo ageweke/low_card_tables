@@ -34,12 +34,20 @@ module LowCardTables
         do_matching(hash_or_hashes, block, :rows_matching)
       end
 
-      def find_ids_for(hash_or_hashes)
+      def find_rows_for(hash_or_hashes)
         do_find_or_create(hash_or_hashes, false)
       end
 
-      def find_or_create_ids_for(hash_or_hashes)
+      def find_or_create_rows_for(hash_or_hashes)
         do_find_or_create(hash_or_hashes, true)
+      end
+
+      def find_ids_for(hash_or_hashes)
+        row_map_to_id_map(find_rows_for(hash_or_hashes))
+      end
+
+      def find_or_create_ids_for(hash_or_hashes)
+        row_map_to_id_map(find_or_create_rows_for(hash_or_hashes))
       end
 
       def value_column_names
@@ -47,6 +55,16 @@ module LowCardTables
       end
 
       private
+      def row_map_to_id_map(m)
+        if m.kind_of?(Hash)
+          out = { }
+          m.each { |k,v| out[k] = v.id }
+          out
+        else
+          m.id
+        end
+      end
+
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
 
       def do_matching(hash_or_hashes, block, method_name)
@@ -65,20 +83,20 @@ module LowCardTables
         hashes = if hash_or_hashes.kind_of?(Array) then hash_or_hashes else [ hash_or_hashes ] end
         hashes.each { |hash| assert_complete_key!(hash) }
 
-        existing = ids_matching(hashes)
+        existing = rows_matching(hashes)
         still_not_found = hashes - existing.keys
 
         if still_not_found.length > 0 && do_create
-          existing = flush_lock_and_create_ids_for!(hashes)
+          existing = flush_lock_and_create_rows_for!(hashes)
         end
 
         out = { }
         existing.each do |key, values|
           if values.length != 1
-            raise %{Whoa: we asked for an ID for this hash: #{key.inspect};
-since this has been asserted to be a complete key, we should only ever get back a single value,
-and we should always get back one value since we will have created the row if necessary,
-but we got back these values:
+            raise %{Whoa: we asked for a row for this hash: #{key.inspect};
+since this has been asserted to be a complete key, we should only ever get back a single row,
+and we should always get back one row since we will have created the row if necessary,
+but we got back these rows:
 
 #{values.inspect}}
           end
@@ -146,14 +164,14 @@ The exception we got was:
         raise LowCardTables::Errors::LowCardInvalidLowCardRowsError, message
       end
 
-      def flush_lock_and_create_ids_for!(hashes)
+      def flush_lock_and_create_rows_for!(hashes)
         with_locked_table do
           flush!(:creating_rows, :context => :before_import, :new_rows => hashes)
 
           # because it's possible there was a schema modification that we just now picked up
           hashes.each { |hash| assert_complete_key!(hash) }
 
-          existing = ids_matching(hashes)
+          existing = rows_matching(hashes)
           still_not_found = hashes - existing.keys
 
           if still_not_found.length > 0
@@ -176,7 +194,7 @@ The exception we got was:
 
           flush!(:creating_rows, :context => :after_import, :new_rows => hashes)
 
-          existing = ids_matching(hashes)
+          existing = rows_matching(hashes)
           still_not_found = hashes - existing.keys
 
           if still_not_found.length > 0
