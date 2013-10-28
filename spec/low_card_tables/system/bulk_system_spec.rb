@@ -199,11 +199,39 @@ describe LowCardTables do
       end
     end
 
-    it "should allow for bulk retrieval-and-creation of rows" do
-      result = ::UserStatus.low_card_find_or_create_rows_for([ @hash1, @hash3, @hash4, @hash5 ])
-      result.size.should == 4
+    def row_from_hash(h)
+      ::UserStatus.new(h)
     end
 
-    it "should not require actually having any associated models"
+    %w{hash object}.each do |input_type|
+      it "should allow for bulk retrieval-and-creation of rows by #{input_type}" do
+        hashes = [ @hash1, @hash3, @hash4, @hash5 ]
+        input = case input_type
+        when 'hash' then hashes
+        when 'object' then hashes.map { |h| ::UserStatus.new(h) }
+        else raise "Unknown input_type: #{input_type.inspect}"
+        end
+
+        result = ::UserStatus.low_card_find_or_create_rows_for(input)
+        result.size.should == 4
+
+        result[input[0]].id.should == @hash1_id
+        result[@hash2].should be_nil
+        result[input[1]].id.should == @hash3_id
+
+        known_ids = [ @hash1_id, @hash2_id, @hash3_id ]
+        known_ids.include?(result[input[2]].id).should_not be
+        known_ids.include?(result[input[3]].id).should_not be
+
+        verify_row(result[input[2]], false, true, 'female', 3)
+        verify_row(result[input[3]], false, true, 'male', 2)
+
+        ::UserStatusBackdoor.count.should == 5
+        verify_row(::UserStatusBackdoor.find(result[@hash1].id), false, false, 'male', 5)
+        verify_row(::UserStatusBackdoor.find(result[@hash3].id), false, false, 'female', 9)
+        verify_row(::UserStatusBackdoor.find(result[@hash4].id), false, true, 'female', 3)
+        verify_row(::UserStatusBackdoor.find(result[@hash5].id), false, true, 'male', 2)
+      end
+    end
   end
 end

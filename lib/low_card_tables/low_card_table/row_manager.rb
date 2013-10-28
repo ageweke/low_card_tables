@@ -42,20 +42,20 @@ module LowCardTables
         do_matching(hash_or_hashes, block, :rows_matching)
       end
 
-      def find_rows_for(hash_or_hashes)
-        do_find_or_create(hash_or_hashes, false)
+      def find_rows_for(hash_hashes_object_or_objects)
+        do_find_or_create(hash_hashes_object_or_objects, false)
       end
 
-      def find_or_create_rows_for(hash_or_hashes)
-        do_find_or_create(hash_or_hashes, true)
+      def find_or_create_rows_for(hash_hashes_object_or_objects)
+        do_find_or_create(hash_hashes_object_or_objects, true)
       end
 
-      def find_ids_for(hash_or_hashes)
-        row_map_to_id_map(find_rows_for(hash_or_hashes))
+      def find_ids_for(hash_hashes_object_or_objects)
+        row_map_to_id_map(find_rows_for(hash_hashes_object_or_objects))
       end
 
-      def find_or_create_ids_for(hash_or_hashes)
-        row_map_to_id_map(find_or_create_rows_for(hash_or_hashes))
+      def find_or_create_ids_for(hash_hashes_object_or_objects)
+        row_map_to_id_map(find_or_create_rows_for(hash_hashes_object_or_objects))
       end
 
       def value_column_names
@@ -76,7 +76,7 @@ module LowCardTables
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
 
       def do_matching(hash_or_hashes, block, method_name)
-        hashes = partial_key_array(hash_or_hashes)
+        hashes = to_array_of_partial_hashes(hash_or_hashes)
 
         begin
           cache.send(method_name, hash_or_hashes, &block)
@@ -86,8 +86,8 @@ module LowCardTables
         end
       end
 
-      def do_find_or_create(hash_or_hashes, do_create)
-        hashes = complete_key_array(hash_or_hashes)
+      def do_find_or_create(hash_hashes_object_or_objects, do_create)
+        hashes = to_array_of_complete_hashes(hash_hashes_object_or_objects)
 
         existing = rows_matching(hashes)
         still_not_found = hashes - existing.keys
@@ -110,10 +110,10 @@ but we got back these rows:
           out[key] = values[0]
         end
 
-        if hash_or_hashes.kind_of?(Array)
+        if hash_hashes_object_or_objects.kind_of?(Array)
           out
         else
-          out[hash_or_hashes]
+          out[hash_hashes_object_or_objects]
         end
       end
 
@@ -175,7 +175,7 @@ The exception we got was:
           flush!(:creating_rows, :context => :before_import, :new_rows => hashes)
 
           # because it's possible there was a schema modification that we just now picked up
-          complete_key_array(hashes)
+          to_array_of_complete_hashes(hashes)
 
           existing = rows_matching(hashes)
           still_not_found = hashes - existing.keys
@@ -273,10 +273,16 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         end
       end
 
-      def complete_key_array(array)
+      def to_array_of_complete_hashes(array)
         array = if array.kind_of?(Array) then array else [ array ] end
-        array.map do |hash|
-          out = hash.with_indifferent_access
+        array.map do |hash_or_object|
+          out = if hash_or_object.kind_of?(ActiveRecord::Base)
+            attributes = hash_or_object.attributes.dup
+            attributes.delete(@low_card_model.primary_key)
+            attributes
+          else
+            hash_or_object.with_indifferent_access
+          end
           assert_complete_key!(out)
           out
         end
@@ -296,7 +302,7 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         end
       end
 
-      def partial_key_array(array)
+      def to_array_of_partial_hashes(array)
         array = if array.kind_of?(Array) then array else [ array ] end
         array.map do |hash|
           out = hash.with_indifferent_access
