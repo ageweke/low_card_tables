@@ -8,11 +8,15 @@ module LowCardTables
         migration_class = Class.new(::ActiveRecord::Migration)
         metaclass = migration_class.class_eval { class << self; self; end }
         metaclass.instance_eval { define_method(:up, &block) }
-        migration_class.migrate(:up)
+
+        ::ActiveRecord::Migration.suppress_messages do
+          migration_class.migrate(:up)
+        end
       end
 
       def define_model_class(name, table_name, &block)
         model_class = Class.new(::ActiveRecord::Base)
+        ::Object.send(:remove_const, name) if ::Object.const_defined?(name)
         ::Object.const_set(name, model_class)
         model_class.table_name = table_name
         model_class.class_eval(&block)

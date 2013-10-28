@@ -5,6 +5,7 @@ LOW_CARD_TABLES_SPEC_DATABASE_CONFIG = {
     :adapter => 'postgresql',
     :database => 'errorsea_development',
     :username => 'postgres',
-    :password => 'SeKEGDTyDLhEBw0KJlIP'
+    :password => 'SeKEGDTyDLhEBw0KJlIP',
+    :min_messages => 'WARNING'
   }
 }
