@@ -39,11 +39,11 @@ describe LowCardTables do
 
       @hash3_id = user.user_status_id
 
-      @hash1 = { :deleted => false, :deceased => false, :gender => 'male', :donation_level => 5 }
-      @hash2 = { :deleted => true, :deceased => false, :gender => 'male', :donation_level => 5 }
-      @hash3 = { :deleted => false, :deceased => false, :gender => 'female', :donation_level => 9 }
-      @hash4 = { :deleted => false, :deceased => true, :gender => 'female', :donation_level => 3 }
-      @hash5 = { :deleted => false, :deceased => true, :gender => 'male', :donation_level => 2 }
+      @hash1 = { :deleted => false, :deceased => false, :gender => 'male', :donation_level => 5 }.with_indifferent_access
+      @hash2 = { :deleted => true, :deceased => false, :gender => 'male', :donation_level => 5 }.with_indifferent_access
+      @hash3 = { :deleted => false, :deceased => false, :gender => 'female', :donation_level => 9 }.with_indifferent_access
+      @hash4 = { :deleted => false, :deceased => true, :gender => 'female', :donation_level => 3 }.with_indifferent_access
+      @hash5 = { :deleted => false, :deceased => true, :gender => 'male', :donation_level => 2 }.with_indifferent_access
     end
 
     after :each do
@@ -199,7 +199,11 @@ describe LowCardTables do
       end
     end
 
-    it "should allow for bulk retrieval-and-creation of rows"
+    it "should allow for bulk retrieval-and-creation of rows" do
+      result = ::UserStatus.low_card_find_or_create_rows_for([ @hash1, @hash3, @hash4, @hash5 ])
+      result.size.should == 4
+    end
+
     it "should not require actually having any associated models"
   end
 end

@@ -76,8 +76,7 @@ module LowCardTables
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
 
       def do_matching(hash_or_hashes, block, method_name)
-        hashes = if hash_or_hashes.kind_of?(Array) then hash_or_hashes else [ hash_or_hashes ] end
-        hashes.each { |h| assert_partial_key!(h) }
+        hashes = partial_key_array(hash_or_hashes)
 
         begin
           cache.send(method_name, hash_or_hashes, &block)
@@ -88,8 +87,7 @@ module LowCardTables
       end
 
       def do_find_or_create(hash_or_hashes, do_create)
-        hashes = if hash_or_hashes.kind_of?(Array) then hash_or_hashes else [ hash_or_hashes ] end
-        hashes.each { |hash| assert_complete_key!(hash) }
+        hashes = complete_key_array(hash_or_hashes)
 
         existing = rows_matching(hashes)
         still_not_found = hashes - existing.keys
@@ -177,7 +175,7 @@ The exception we got was:
           flush!(:creating_rows, :context => :before_import, :new_rows => hashes)
 
           # because it's possible there was a schema modification that we just now picked up
-          hashes.each { |hash| assert_complete_key!(hash) }
+          complete_key_array(hashes)
 
           existing = rows_matching(hashes)
           still_not_found = hashes - existing.keys
@@ -275,6 +273,15 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         end
       end
 
+      def complete_key_array(array)
+        array = if array.kind_of?(Array) then array else [ array ] end
+        array.map do |hash|
+          out = hash.with_indifferent_access
+          assert_complete_key!(out)
+          out
+        end
+      end
+
       def assert_complete_key!(hash)
         keys_as_strings = hash.keys.map(&:to_s)
         missing = value_column_names - keys_as_strings
@@ -286,6 +293,15 @@ equivalent of 'LOCK TABLE'(s) in your database.}
 
         if extra.length > 0
           raise LowCardTables::Errors::LowCardColumnNotPresentError, "The following specifies extra columns that are not present in low-card table '#{@low_card_model.table_name}'; these columns are not present in the underlying model: #{extra.join(", ")}: #{hash.inspect}"
+        end
+      end
+
+      def partial_key_array(array)
+        array = if array.kind_of?(Array) then array else [ array ] end
+        array.map do |hash|
+          out = hash.with_indifferent_access
+          assert_partial_key!(out)
+          out
         end
       end
 
