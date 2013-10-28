@@ -151,12 +151,51 @@ describe LowCardTables do
       end
     end
 
+    it "should raise an exception if there are missing values in the hashes" do
+      ensure_zero_database_calls do
+        lambda { ::UserStatus.low_card_find_rows_for([ { :deleted => false, :gender => 'male', :donation_level => 5 }]) }.should raise_error(LowCardTables::Errors::LowCardColumnNotSpecifiedError)
+        lambda { ::UserStatus.low_card_find_ids_for([ { :deleted => false, :gender => 'male', :donation_level => 5 }]) }.should raise_error(LowCardTables::Errors::LowCardColumnNotSpecifiedError)
+      end
+    end
+
     it "should allow for bulk retrieval of rows by IDs" do
       ensure_zero_database_calls do
-        bogus_id_1 = rand(1_000_000) + 1_000_000
-        bogus_id_2 = rand(1_000_000) + 1_000_000
-        results = ::UserStatus.low_card_rows_for_ids([ @hash1_id, @hash2_id, @hash3_id, bogus_id_1, bogus_id_2 ])
+        results = ::UserStatus.low_card_rows_for_ids([ @hash1_id, @hash3_id ])
+        results.size.should == 2
+        verify_row(results[@hash1_id], false, false, 'male', 5)
+        verify_row(results[@hash3_id], false, false, 'female', 9)
+      end
+    end
+
+    it "should raise if asked for an ID that's not present" do
+      random_id = 1_000_000 + rand(1_000_000)
+
+      e = nil
+      begin
+        ::UserStatus.low_card_rows_for_ids([ @hash1_id, @hash3_id, random_id ])
+      rescue => x
+        e = x
+      end
+
+      e.should be
+      e.class.should == LowCardTables::Errors::LowCardIdNotFoundError
+      e.ids.should == [ random_id ]
+    end
+
+    it "should allow for retrieving all rows" do
+      ensure_zero_database_calls do
+        results = ::UserStatus.low_card_all_rows
         results.size.should == 3
+        verify_by_id(results, @hash1_id, false, false, 'male', 5)
+        verify_by_id(results, @hash2_id, true, false, 'male', 5)
+        verify_by_id(results, @hash3_id, false, false, 'female', 9)
+      end
+    end
+
+    it "should allow retrieving an individual row directly" do
+      ensure_zero_database_calls do
+        row = ::UserStatus.low_card_row_for_id(@hash2_id)
+        verify_row(row, true, false, 'male', 5)
       end
     end
 

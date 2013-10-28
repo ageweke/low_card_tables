@@ -17,6 +17,10 @@ module LowCardTables
         cache.all_rows
       end
 
+      def flush_cache!
+        flush!(:manually_requested)
+      end
+
       def rows_for_ids(id_or_ids)
         begin
           cache.rows_for_ids(id_or_ids)

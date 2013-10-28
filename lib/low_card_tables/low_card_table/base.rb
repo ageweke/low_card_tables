@@ -45,7 +45,7 @@ module LowCardTables
           _low_card_row_manager.value_column_names
         end
 
-        [ :all_rows, :row_for_id, :rows_for_ids, :rows_matching, :ids_matching, :find_ids_for, :find_or_create_ids_for, :find_rows_for, :find_or_create_rows_for ].each do |delegated_method_name|
+        [ :all_rows, :row_for_id, :rows_for_ids, :rows_matching, :ids_matching, :find_ids_for, :find_or_create_ids_for, :find_rows_for, :find_or_create_rows_for, :flush_cache! ].each do |delegated_method_name|
           define_method("low_card_#{delegated_method_name}") do |*args|
             _low_card_row_manager.send(delegated_method_name, *args)
           end

@@ -195,6 +195,25 @@ describe LowCardTables do
       load_event[:data][:low_card_model].should == ::UserStatus
     end
 
+    it "should notify listeners when the cache is manually flushed" do
+      user1 = create_basic_user
+      call_count = @cache_listener.calls.length
+
+      start_time = Time.now
+      ::UserStatus.low_card_flush_cache!
+      new_calls = @cache_listener.calls[call_count..-1]
+      end_time = Time.now
+
+      new_calls.length.should == 1
+      new_call = new_calls[0]
+      new_call[:name].should == 'low_card_tables.cache_flush'
+      new_call[:started].should >= start_time
+      new_call[:finished].should >= new_call[:started]
+      new_call[:finished].should <= end_time
+      new_call[:data][:reason].should == :manually_requested
+      new_call[:data][:low_card_model].should == ::UserStatus
+    end
+
     it "should notify listeners when adding a new row" do
       @cache_listener.calls.length.should == 0
 
