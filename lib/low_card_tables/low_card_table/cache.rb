@@ -28,6 +28,10 @@ module LowCardTables
         out
       end
 
+      def all_rows
+        @rows_by_id.values
+      end
+
       def rows_for_ids(id_or_ids)
         ids = Array(id_or_ids)
 

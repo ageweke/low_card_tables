@@ -1,6 +1,7 @@
 require 'low_card_tables'
 require 'low_card_tables/helpers/database_helper'
 require 'low_card_tables/helpers/system_helpers'
+require 'low_card_tables/helpers/query_spy_helper'
 
 describe LowCardTables do
   include LowCardTables::Helpers::SystemHelpers
@@ -62,63 +63,101 @@ describe LowCardTables do
       verify_row(row, deleted, deceased, gender, donation_level)
     end
 
+    def ensure_zero_database_calls(&block)
+      LowCardTables::Helpers::QuerySpyHelper.with_query_spy('lctables_spec_user_statuses') do |spy|
+        ::UserStatus.low_card_all_rows
+
+        pre_count = spy.call_count
+        block.call
+        post_count = spy.call_count
+        post_count.should == pre_count
+      end
+    end
+
     it "should allow for bulk retrieval of subsets of rows" do
-      hash_selector_1 = { :deleted => false, :deceased => false }
-      hash_selector_2 = { :deceased => false, :donation_level => 5 }
-      results = ::UserStatus.low_card_rows_matching([ hash_selector_1, hash_selector_2 ])
+      ensure_zero_database_calls do
+        hash_selector_1 = { :deleted => false, :deceased => false }
+        hash_selector_2 = { :deceased => false, :donation_level => 5 }
+        results = ::UserStatus.low_card_rows_matching([ hash_selector_1, hash_selector_2 ])
 
-      results.size.should == 2
+        results.size.should == 2
 
-      results[hash_selector_1].should be
-      results[hash_selector_1].length.should == 2
-      results[hash_selector_1].map(&:id).sort.should == [ @hash1_id, @hash3_id ].sort
+        results[hash_selector_1].should be
+        results[hash_selector_1].length.should == 2
+        results[hash_selector_1].map(&:id).sort.should == [ @hash1_id, @hash3_id ].sort
 
-      verify_by_id(results[hash_selector_1], @hash1_id, false, false, 'male', 5)
-      verify_by_id(results[hash_selector_1], @hash3_id, false, false, 'female', 9)
+        verify_by_id(results[hash_selector_1], @hash1_id, false, false, 'male', 5)
+        verify_by_id(results[hash_selector_1], @hash3_id, false, false, 'female', 9)
 
-      results[hash_selector_2].should be
-      results[hash_selector_2].length.should == 2
-      results[hash_selector_2].map(&:id).sort.should == [ @hash1_id, @hash2_id ].sort
+        results[hash_selector_2].should be
+        results[hash_selector_2].length.should == 2
+        results[hash_selector_2].map(&:id).sort.should == [ @hash1_id, @hash2_id ].sort
 
-      verify_by_id(results[hash_selector_2], @hash1_id, false, false, 'male', 5)
-      verify_by_id(results[hash_selector_2], @hash2_id, true, false, 'male', 5)
+        verify_by_id(results[hash_selector_2], @hash1_id, false, false, 'male', 5)
+        verify_by_id(results[hash_selector_2], @hash2_id, true, false, 'male', 5)
+      end
     end
 
     it "should allow for bulk retrieval of subsets of IDs" do
-      hash_selector_1 = { :deleted => false, :deceased => false }
-      hash_selector_2 = { :deceased => false, :donation_level => 5 }
-      results = ::UserStatus.low_card_ids_matching([ hash_selector_1, hash_selector_2 ])
+      ensure_zero_database_calls do
+        hash_selector_1 = { :deleted => false, :deceased => false }
+        hash_selector_2 = { :deceased => false, :donation_level => 5 }
+        results = ::UserStatus.low_card_ids_matching([ hash_selector_1, hash_selector_2 ])
 
-      results.size.should == 2
+        results.size.should == 2
 
-      results[hash_selector_1].should be
-      results[hash_selector_1].length.should == 2
-      results[hash_selector_1].sort.should == [ @hash1_id, @hash3_id ].sort
+        results[hash_selector_1].should be
+        results[hash_selector_1].length.should == 2
+        results[hash_selector_1].sort.should == [ @hash1_id, @hash3_id ].sort
 
-      results[hash_selector_2].should be
-      results[hash_selector_2].length.should == 2
-      results[hash_selector_2].sort.should == [ @hash1_id, @hash2_id ].sort
+        results[hash_selector_2].should be
+        results[hash_selector_2].length.should == 2
+        results[hash_selector_2].sort.should == [ @hash1_id, @hash2_id ].sort
+      end
     end
 
     it "should raise an exception if passed invalid values in the hashes" do
-      lambda { ::UserStatus.low_card_rows_matching([ { :deleted => false, :foo => 1 }]) }.should raise_error(LowCardTables::Errors::LowCardColumnNotPresentError)
-      lambda { ::UserStatus.low_card_ids_matching([ { :deleted => false, :foo => 1 }]) }.should raise_error(LowCardTables::Errors::LowCardColumnNotPresentError)
+      ensure_zero_database_calls do
+        lambda { ::UserStatus.low_card_rows_matching([ { :deleted => false, :foo => 1 }]) }.should raise_error(LowCardTables::Errors::LowCardColumnNotPresentError)
+        lambda { ::UserStatus.low_card_ids_matching([ { :deleted => false, :foo => 1 }]) }.should raise_error(LowCardTables::Errors::LowCardColumnNotPresentError)
+      end
     end
 
     it "should allow for bulk retrieval of rows with exact matches" do
-      results = ::UserStatus.low_card_find_rows_for([ @hash1, @hash2, @hash3, @hash4, @hash5 ])
+      ensure_zero_database_calls do
+        results = ::UserStatus.low_card_find_rows_for([ @hash1, @hash2, @hash3, @hash4, @hash5 ])
+        results.size.should == 3
 
-      results[@hash1].should be
-      results[@hash1].class.should == ::UserStatus
-      results[@hash1].deleted.should == false
-      results[@hash1].deceased.should == false
-      results[@hash1].gender.should == 'male'
-      results[@hash1].donation_level.should == 5
+        verify_row(results[@hash1], false, false, 'male', 5)
+        verify_row(results[@hash2], true, false, 'male', 5)
+        verify_row(results[@hash3], false, false, 'female', 9)
 
-      results[@hash2].should be
-      results[@hash3].should be
-      results[@hash4].should_not be
-      results[@hash5].should_not be
+        results[@hash4].should_not be
+        results[@hash5].should_not be
+      end
+    end
+
+    it "should allow for bulk retrieval of IDs with exact matches" do
+      ensure_zero_database_calls do
+        results = ::UserStatus.low_card_find_ids_for([ @hash1, @hash2, @hash3, @hash4, @hash5 ])
+        results.size.should == 3
+
+        results[@hash1].should == @hash1_id
+        results[@hash2].should == @hash2_id
+        results[@hash3].should == @hash3_id
+
+        results[@hash4].should_not be
+        results[@hash5].should_not be
+      end
+    end
+
+    it "should allow for bulk retrieval of rows by IDs" do
+      ensure_zero_database_calls do
+        bogus_id_1 = rand(1_000_000) + 1_000_000
+        bogus_id_2 = rand(1_000_000) + 1_000_000
+        results = ::UserStatus.low_card_rows_for_ids([ @hash1_id, @hash2_id, @hash3_id, bogus_id_1, bogus_id_2 ])
+        results.size.should == 3
+      end
     end
 
     it "should allow for bulk retrieval-and-creation of rows"

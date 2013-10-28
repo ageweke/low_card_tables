@@ -13,6 +13,10 @@ module LowCardTables
         @low_card_model = low_card_model
       end
 
+      def all_rows
+        cache.all_rows
+      end
+
       def rows_for_ids(id_or_ids)
         begin
           cache.rows_for_ids(id_or_ids)
