@@ -139,6 +139,19 @@ describe LowCardTables do
           end
         end
       end
+
+      it "using #change_table" do
+        tn = @table_name
+        eo = extra_options(explicit_or_model)
+        check_unique_index_modification(explicit_or_model, { :deleted => false, :deceased => false, :gender => 'male', :donation_level => 5 },
+          { :awesomeness => 10 },
+          { :awesomeness => 5 },
+          { :awesomeness => 10 }) do
+          change_table tn, eo do |t|
+            t.integer :awesomeness
+          end
+        end
+      end
     end
   end
 

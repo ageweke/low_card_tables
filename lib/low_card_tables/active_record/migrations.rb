@@ -27,10 +27,17 @@ module LowCardTables
         end
       end
 
+      def change_table_with_low_card_support(table_name, options = { }, &block)
+        ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, options) do |new_options|
+          change_table_without_low_card_support(table_name, new_options, &block)
+        end
+      end
+
       included do
         alias_method_chain :create_table, :low_card_support
         alias_method_chain :add_column, :low_card_support
         alias_method_chain :remove_column, :low_card_support
+        alias_method_chain :change_table, :low_card_support
       end
 
       class << self
