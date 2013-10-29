@@ -5,6 +5,9 @@ module LowCardTables
     class LowCardColumnError < LowCardError; end
     class LowCardColumnNotPresentError < LowCardColumnError; end
     class LowCardColumnNotSpecifiedError < LowCardColumnError; end
+
+    class LowCardNoUniqueIndexError < LowCardError; end
+
     class LowCardIdNotFoundError < LowCardError
       def initialize(message, ids)
         super(message)

@@ -62,7 +62,85 @@ module LowCardTables
         @value_column_names ||= value_columns.map(&:name)
       end
 
+      def ensure_has_unique_index!(create_if_needed = false)
+        current_name = current_unique_all_columns_index_name
+        return current_name if current_name
+
+        if create_if_needed
+          create_unique_index!
+        else
+          message = %{You said that the table '#{@low_card_model.table_name}' is a low-card table.
+However, it currently does not seem to have a unique index on all its columns. For the
+low-card system to work properly, this is *required* -- although the low-card system
+tries very hard to lock tables and otherwise ensure that it never will create duplicate
+rows, this is important enough that we really want the database to enforce it.
+
+We're looking for an index on the following columns:
+
+  #{value_column_names.sort.join(", ")}
+
+...and we have the following unique indexes:
+
+}
+          current_unique_indexes.each do |unique_index|
+            message << "  '#{unique_index.name}': #{unique_index.columns.sort.join(", ")}\n"
+          end
+          message << "\n"
+
+          raise LowCardTables::Errors::LowCardNoUniqueIndexError, message
+        end
+      end
+
       private
+      def create_unique_index!
+        raise "Whoa -- there should never already be a unique index for #{@low_card_model}!" if current_unique_all_columns_index_name
+
+        table_name = @low_card_model.table_name
+        column_names = value_column_names
+        ideal_name = ideal_unique_all_columns_index_name
+
+        block = lambda do
+          add_index table_name, column_names, :unique => true, :name => ideal_name
+        end
+
+        migration_class = Class.new(::ActiveRecord::Migration)
+        metaclass = migration_class.class_eval { class << self; self; end }
+        metaclass.instance_eval { define_method(:up, &block) }
+
+        ::ActiveRecord::Migration.suppress_messages do
+          migration_class.migrate(:up)
+        end
+
+        unless current_unique_all_columns_index_name
+          raise "Whoa -- there should always be a unique index by now for #{@low_card_model}! We think we created one, but now it still doesn't exist?!?"
+        end
+
+        ideal_name
+      end
+
+      def current_unique_indexes
+        @low_card_model.connection.indexes(@low_card_model.table_name).select { |i| i.unique }
+      end
+
+      def current_unique_all_columns_index_name
+        index = current_unique_indexes.detect { |index| index.columns.sort == value_column_names.sort }
+        index.name if index
+      end
+
+      # We just limit all index names to this length -- this should be the smallest maximum index-name length that
+      # any database supports.
+      MINIMUM_MAX_INDEX_NAME_LENGTH = 63
+
+      def ideal_unique_all_columns_index_name
+        index_part_1 = "index_"
+        index_part_2 = "_lc_on_all"
+
+        remaining_characters = MINIMUM_MAX_INDEX_NAME_LENGTH - (index_part_1.length + index_part_2.length)
+        index_name = index_part_1 + (@low_card_model.table_name[0..(remaining_characters - 1)]) + index_part_2
+
+        index_name
+      end
+
       def row_map_to_id_map(m)
         if m.kind_of?(Hash)
           out = { }
