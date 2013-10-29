@@ -64,6 +64,7 @@ module LowCardTables
 
       def ensure_has_unique_index!(create_if_needed = false)
         current_name = current_unique_all_columns_index_name
+        $stderr.puts "ensure_has_unique_index!: #{current_name.inspect}"
         return current_name if current_name
 
         if create_if_needed

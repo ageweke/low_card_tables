@@ -70,7 +70,37 @@ describe LowCardTables do
     }.should raise_error(ActiveRecord::StatementInvalid)
   end
 
-  it "should automatically change the unique index in migrations if explicitly told it's a low-card table"
+  it "should automatically change the unique index in migrations if explicitly told it's a low-card table" do
+    migrate do
+      drop_table :lctables_spec_user_statuses rescue nil
+      create_table :lctables_spec_user_statuses, :low_card => true do |t|
+        t.boolean :deleted, :null => false
+        t.boolean :deceased
+        t.string :gender, :null => false
+        t.integer :donation_level
+      end
+    end
+
+    $stderr.puts "ADDING COLUMN..."
+    migrate do
+      add_column :lctables_spec_user_statuses, :awesomeness, :integer, :low_card => true
+    end
+    $stderr.puts "ADDED COLUMN."
+
+    # This is deliberately *not* a low-card table
+    define_model_class(:UserStatus, 'lctables_spec_user_statuses') { }
+    ::UserStatus.reset_column_information
+
+    status_1 = ::UserStatus.create!(:deleted => false, :deceased => false, :gender => 'male', :donation_level => 5, :awesomeness => 10)
+    # make sure we can create a different one
+    status_2 = ::UserStatus.create!(:deleted => false, :deceased => false, :gender => 'male', :donation_level => 5, :awesomeness => 5)
+    # now, make sure we can't create a duplicate
+    lambda {
+      ::UserStatus.create!(:deleted => false, :deceased => false, :gender => 'male', :donation_level => 5, :awesomeness => 10)
+    }.should raise_error(ActiveRecord::StatementInvalid)
+  end
+
+
   it "should automatically change the unique index in migrations if there's a model saying it's a low-card table"
 
 
