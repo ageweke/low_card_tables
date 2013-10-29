@@ -113,18 +113,34 @@ describe LowCardTables do
       if explicit_or_model == :explicit then { :low_card => true } else { } end
     end
 
-    it "should automatically change the unique index in migrations if told it's a low-card table (#{explicit_or_model})" do
-      tn = @table_name
-      eo = extra_options(explicit_or_model)
-      check_unique_index_modification(explicit_or_model, { :deleted => false, :deceased => false, :gender => 'male', :donation_level => 5 },
-        { :awesomeness => 10 },
-        { :awesomeness => 5 },
-        { :awesomeness => 10 }) do
-        add_column tn, :awesomeness, :integer, eo
+    describe "should automatically change the unique index in migrations if told it's a low-card table (#{explicit_or_model})" do
+      it "using #add_column" do
+        tn = @table_name
+        eo = extra_options(explicit_or_model)
+        check_unique_index_modification(explicit_or_model, { :deleted => false, :deceased => false, :gender => 'male', :donation_level => 5 },
+          { :awesomeness => 10 },
+          { :awesomeness => 5 },
+          { :awesomeness => 10 }) do
+          add_column tn, :awesomeness, :integer, eo
+        end
+      end
+
+      it "using #remove_column" do
+        tn = @table_name
+        eo = extra_options(explicit_or_model)
+        check_unique_index_modification(explicit_or_model, { :deleted => false, :deceased => false },
+          { :gender => 'male' },
+          { :gender => 'female' },
+          { :gender => 'male' }) do
+          if eo.size > 0
+            remove_column tn, :donation_level, eo
+          else
+            remove_column tn, :donation_level
+          end
+        end
       end
     end
   end
-
 
 
   it "should automatically change the unique index in migrations if there's a model saying it's a low-card table"
