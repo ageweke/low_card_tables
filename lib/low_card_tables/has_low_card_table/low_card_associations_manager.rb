@@ -31,6 +31,12 @@ module LowCardTables
         @associations[association_name] = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, association_name, options)
       end
 
+      def low_card_column_information_reset!(low_card_model)
+        @associations.values.each do |association|
+          association.low_card_column_information_reset! if association.low_card_class == low_card_model
+        end
+      end
+
       def _low_card_association(name)
         @associations[name.to_s] || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{name}' for #{@model_class.name}; there are associations named: #{@associations.keys.sort.join(", ")}.")
       end

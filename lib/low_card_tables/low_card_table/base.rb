@@ -29,6 +29,11 @@ module LowCardTables
           true
         end
 
+        def reset_column_information
+          super
+          _low_card_row_manager.column_information_reset!
+        end
+
         def low_card_options
           @_low_card_options ||= { }
         end
@@ -49,7 +54,11 @@ module LowCardTables
           _low_card_row_manager.ensure_has_unique_index!(create_if_needed)
         end
 
-        [ :all_rows, :row_for_id, :rows_for_ids, :rows_matching, :ids_matching, :find_ids_for, :find_or_create_ids_for, :find_rows_for, :find_or_create_rows_for, :flush_cache! ].each do |delegated_method_name|
+        def _low_card_referred_to_by(referring_model_class)
+          _low_card_row_manager.referred_to_by(referring_model_class)
+        end
+
+        [ :all_rows, :row_for_id, :rows_for_ids, :rows_matching, :ids_matching, :find_ids_for, :find_or_create_ids_for, :find_rows_for, :find_or_create_rows_for, :flush_cache!, :referring_models ].each do |delegated_method_name|
           define_method("low_card_#{delegated_method_name}") do |*args|
             _low_card_row_manager.send(delegated_method_name, *args)
           end

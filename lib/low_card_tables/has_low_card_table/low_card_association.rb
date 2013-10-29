@@ -11,9 +11,9 @@ module LowCardTables
         # call a few methods that will raise errors if things are configured incorrectly;
         # we call them here so that you get those errors immediately, at startup, instead of
         # at some undetermined later point
-
         foreign_key_column_name
-        low_card_class
+
+        low_card_class._low_card_referred_to_by(model_class)
       end
 
       def create_low_card_object_for(model_instance)
@@ -50,6 +50,48 @@ module LowCardTables
         end
       end
 
+      def low_card_column_information_reset!
+        sync_installed_methods!
+      end
+
+      def low_card_class
+        @low_card_class ||= begin
+          # e.g., class User has_low_card_table :status => UserStatus
+          out = options[:class] || "#{model_class.name.underscore.singularize}_#{association_name}"
+
+          out = out.to_s if out.kind_of?(Symbol)
+          out = out.camelize
+
+          if out.kind_of?(String)
+            begin
+              out = out.constantize
+            rescue NameError => ne
+              raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name}, and we have a
+:class of #{out.inspect}, but, when we tried to load that class (via #constantize),
+we got a NameError. Perhaps you misspelled it, or something else is wrong?
+
+NameError: (#{ne.class.name}): #{ne.message}}
+            end
+          end
+
+          unless out.kind_of?(Class)
+            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name} with a
+:class of #{out.inspect}, but that isn't a String or Symbol that represents a class,
+or a valid Class object itself.}
+          end
+
+          unless out.respond_to?(:is_low_card_table?) && out.is_low_card_table?
+            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name},
+and we have class #{out} for that low-card table (which is a Class), but it
+either isn't an ActiveRecord model or, if so, it doesn't think it is a low-card
+table itself (#is_low_card_table? returns false).
+
+Perhaps you need to declare 'is_low_card_table' on that class?}
+          end
+
+          out
+        end
+      end
       private
       attr_reader :association_name, :options, :model_class
 
@@ -134,45 +176,6 @@ to have a column named that at all. Did you misspell it? Or perhaps something el
           raise %{Whoa! The LowCardAssociation '#{association_name}' for class #{model_class} somehow
 was passed a model of class #{model_instance.class} (model: #{model_instance}),
 which is not of the correct class.}
-        end
-      end
-
-      def low_card_class
-        @low_card_class ||= begin
-          # e.g., class User has_low_card_table :status => UserStatus
-          out = options[:class] || "#{model_class.name.underscore.singularize}_#{association_name}"
-
-          out = out.to_s if out.kind_of?(Symbol)
-          out = out.camelize
-
-          if out.kind_of?(String)
-            begin
-              out = out.constantize
-            rescue NameError => ne
-              raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name}, and we have a
-:class of #{out.inspect}, but, when we tried to load that class (via #constantize),
-we got a NameError. Perhaps you misspelled it, or something else is wrong?
-
-NameError: (#{ne.class.name}): #{ne.message}}
-            end
-          end
-
-          unless out.kind_of?(Class)
-            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name} with a
-:class of #{out.inspect}, but that isn't a String or Symbol that represents a class,
-or a valid Class object itself.}
-          end
-
-          unless out.respond_to?(:is_low_card_table?) && out.is_low_card_table?
-            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name},
-and we have class #{out} for that low-card table (which is a Class), but it
-either isn't an ActiveRecord model or, if so, it doesn't think it is a low-card
-table itself (#is_low_card_table? returns false).
-
-Perhaps you need to declare 'is_low_card_table' on that class?}
-          end
-
-          out
         end
       end
     end

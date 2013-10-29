@@ -63,8 +63,17 @@ describe LowCardTables do
       add_column tn, :awesomeness, :integer, :null => false, :default => 123
     end
 
+    ::UserStatus.reset_column_information
     @user3 = create_user!('User3', false, true, 'male', 10)
+    @user3.status.awesomeness.should == 123
     @user3.awesomeness.should == 123
+
+    @user3.awesomeness = 345
+    @user3.save!
+
+    @user3_again = ::User.find(@user3.id)
+    @user3_again.status.awesomeness.should == 345
+    @user3_again.awesomeness.should == 345
   end
 
   it "should throw out the cache if the schema has changed"

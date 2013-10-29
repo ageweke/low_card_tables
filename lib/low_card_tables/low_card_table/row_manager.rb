@@ -11,6 +11,17 @@ module LowCardTables
         end
 
         @low_card_model = low_card_model
+        @referring_models = [ ]
+      end
+
+      attr_reader :referring_models
+
+      def referred_to_by(referring_model_class)
+        @referring_models |= [ referring_model_class ]
+      end
+
+      def column_information_reset!
+        @referring_models.each { |m| m._low_card_associations_manager.low_card_column_information_reset!(@low_card_model) }
       end
 
       def all_rows
