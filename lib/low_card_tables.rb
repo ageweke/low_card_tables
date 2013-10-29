@@ -2,7 +2,7 @@ require 'active_record'
 require 'active_support'
 require "low_card_tables/version"
 require 'low_card_tables/active_record/base'
-require 'low_card_tables/active_record/connection_adapters/schema_statements'
+require 'low_card_tables/active_record/migrations'
 require 'low_card_tables/low_card_table/cache_expiration/has_cache_expiration'
 
 module LowCardTables
@@ -16,5 +16,5 @@ class ActiveRecord::Base
 end
 
 module ActiveRecord::ConnectionAdapters::SchemaStatements
-  include LowCardTables::ActiveRecord::ConnectionAdapters::SchemaStatements
+  include LowCardTables::ActiveRecord::Migrations
 end
