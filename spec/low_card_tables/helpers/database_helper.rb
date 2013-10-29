@@ -1,5 +1,3 @@
-require 'active_record'
-
 module LowCardTables
   module Helpers
     class DatabaseHelper
@@ -21,6 +19,7 @@ module LowCardTables
       end
 
       def setup_activerecord!
+        require 'active_record'
         require config[:require]
         ::ActiveRecord::Base.establish_connection(config[:config])
       end

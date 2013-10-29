@@ -1,6 +1,7 @@
 require 'low_card_tables'
 require 'low_card_tables/helpers/database_helper'
 require 'low_card_tables/helpers/system_helpers'
+require 'pry'
 
 describe LowCardTables do
   include LowCardTables::Helpers::SystemHelpers
@@ -63,8 +64,11 @@ describe LowCardTables do
       add_column tn, :awesomeness, :integer, :null => false, :default => 123
     end
 
+    # binding.pry
     ::UserStatus.reset_column_information
+    cols = ::UserStatus.columns
     @user3 = create_user!('User3', false, true, 'male', 10)
+    # sleep 1_000_000
     @user3.status.awesomeness.should == 123
     @user3.awesomeness.should == 123
 
@@ -242,7 +246,6 @@ describe LowCardTables do
         status_1_attributes = status_1.attributes.dup
         status_1_attributes.delete(:id)
         status_1_attributes.delete("id")
-        $stderr.puts "status_1_attributes: #{status_1_attributes.inspect}"
 
         new_status = ::UserStatus.new(status_1_attributes)
         new_status.save_low_card_row!

@@ -54,6 +54,10 @@ module LowCardTables
           _low_card_row_manager.ensure_has_unique_index!(create_if_needed)
         end
 
+        def _low_card_remove_unique_index!
+          _low_card_row_manager.remove_unique_index!
+        end
+
         def _low_card_referred_to_by(referring_model_class)
           _low_card_row_manager.referred_to_by(referring_model_class)
         end

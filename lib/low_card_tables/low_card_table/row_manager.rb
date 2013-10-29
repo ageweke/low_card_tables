@@ -102,7 +102,36 @@ We're looking for an index on the following columns:
         end
       end
 
+      def remove_unique_index!
+        table_name = @low_card_model.table_name
+        current_name = current_unique_all_columns_index_name
+
+        if current_name
+          migrate do
+            remove_index table_name, :name => current_name
+          end
+
+          now_current_name = current_unique_all_columns_index_name
+          if now_current_name
+            raise "Whoa -- we tried to remove the unique index on #{table_name}, which was named '#{current_name}', but, after we removed it, we still have a unique all-columns index called '#{now_current_name}'!"
+          end
+        end
+      end
+
       private
+      def migrate(&block)
+        migration_class = Class.new(::ActiveRecord::Migration)
+        metaclass = migration_class.class_eval { class << self; self; end }
+        metaclass.instance_eval { define_method(:up, &block) }
+
+        ::ActiveRecord::Migration.suppress_messages do
+          migration_class.migrate(:up)
+        end
+
+        @low_card_model.reset_column_information
+        @low_card_model.connection.schema_cache.clear!
+      end
+
       def create_unique_index!
         raise "Whoa -- there should never already be a unique index for #{@low_card_model}!" if current_unique_all_columns_index_name
 
@@ -110,17 +139,9 @@ We're looking for an index on the following columns:
         column_names = value_column_names
         ideal_name = ideal_unique_all_columns_index_name
 
-        block = lambda do
+        migrate do
           remove_index table_name, :name => ideal_name rescue nil
           add_index table_name, column_names, :unique => true, :name => ideal_name
-        end
-
-        migration_class = Class.new(::ActiveRecord::Migration)
-        metaclass = migration_class.class_eval { class << self; self; end }
-        metaclass.instance_eval { define_method(:up, &block) }
-
-        ::ActiveRecord::Migration.suppress_messages do
-          migration_class.migrate(:up)
         end
 
         unless current_unique_all_columns_index_name

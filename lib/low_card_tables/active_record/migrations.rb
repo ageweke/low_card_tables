@@ -50,11 +50,17 @@ module LowCardTables
         def verify_unique_index_as_needed(table_name, options = { }, &block)
           options = (options || { }).dup
           low_card_option = options.delete(:low_card)
+          low_card_model = existing_low_card_model_for(table_name)
 
-          result = block.call(options)
+          model_class_to_use = temporary_model_class_for(table_name)
 
-          if low_card_option || model_exists_declaring_as_low_card?(table_name)
-            temporary_model_class_for(table_name)._low_card_ensure_has_unique_index!(true)
+          is_low_card = (low_card_option || low_card_model)
+
+          begin
+            # model_class_to_use._low_card_remove_unique_index! if is_low_card
+            result = block.call(options)
+          ensure
+            model_class_to_use._low_card_ensure_has_unique_index!(true) if is_low_card
           end
 
           result
@@ -69,7 +75,7 @@ module LowCardTables
           temporary_model_class
         end
 
-        def model_exists_declaring_as_low_card?(table_name)
+        def existing_low_card_model_for(table_name)
           # Make sure we load all models
           ::Rails.application.eager_load! if defined?(::Rails)
           out = ::ActiveRecord::Base.descendants.detect do |klass|

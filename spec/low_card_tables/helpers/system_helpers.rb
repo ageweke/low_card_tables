@@ -12,6 +12,8 @@ module LowCardTables
         ::ActiveRecord::Migration.suppress_messages do
           migration_class.migrate(:up)
         end
+
+        ::ActiveRecord::Base.connection.schema_cache.clear!
       end
 
       def define_model_class(name, table_name, &block)
