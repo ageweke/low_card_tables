@@ -17,8 +17,9 @@ describe LowCardTables do
   end
 
   after :each do
+    tn = @table_name
     migrate do
-      drop_table @table_name rescue nil
+      drop_table tn rescue nil
     end
   end
 
@@ -152,19 +153,25 @@ describe LowCardTables do
           end
         end
       end
+
+      it "using #change_low_card_table" do
+        tn = @table_name
+        eo = extra_options(explicit_or_model)
+        check_unique_index_modification(explicit_or_model, { :deleted => false, :deceased => false, :gender => 'male', :donation_level => 5 },
+          { :awesomeness => 10 },
+          { :awesomeness => 5 },
+          { :awesomeness => 10 }) do
+          change_low_card_table(tn) do
+            execute "ALTER TABLE #{tn} ADD COLUMN awesomeness INTEGER"
+          end
+        end
+      end
     end
   end
-
-
-  it "should automatically change the unique index in migrations if there's a model saying it's a low-card table"
-
 
   it "should allow removing a column, and thus collapsing rows that are now identical"
 
   it "should fail if there is no unique index on a low-card table at startup" do
-    # Very important: we have to use a different table name here than we've used previously, because there may well
-    # still be model class definitions hanging around from other tests, and there's really no good way of excluding
-    # them from our code's search for model definitions.
     tn = @table_name
 
     migrate do
@@ -177,11 +184,11 @@ describe LowCardTables do
       end
     end
 
-    define_model_class(:UserStatus2, @table_name) { is_low_card_table }
+    define_model_class(:UserStatus, @table_name) { is_low_card_table }
 
     e = nil
     begin
-      ::UserStatus2.low_card_all_rows
+      ::UserStatus.low_card_all_rows
     rescue LowCardTables::Errors::LowCardNoUniqueIndexError => lcnuie
       e = lcnuie
     end

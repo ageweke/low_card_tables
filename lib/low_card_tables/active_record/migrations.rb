@@ -33,6 +33,12 @@ module LowCardTables
         end
       end
 
+      def change_low_card_table(table_name, &block)
+        ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, { :low_card => true }) do |new_options|
+          block.call
+        end
+      end
+
       included do
         alias_method_chain :create_table, :low_card_support
         alias_method_chain :add_column, :low_card_support
