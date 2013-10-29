@@ -8,12 +8,13 @@ describe LowCardTables do
   before :each do
     @dh = LowCardTables::Helpers::DatabaseHelper.new
     @dh.setup_activerecord!
+
+    @table_name = "lctables_spec_user_statuses_#{rand(1_000_000)}".to_sym
   end
 
   after :each do
     migrate do
-      drop_table :lctables_spec_user_statuses rescue nil
-      drop_table :lctables_spec_user_statuses_2 rescue nil
+      drop_table spec_table_name rescue nil
     end
   end
 
@@ -23,9 +24,10 @@ describe LowCardTables do
   it "should throw out the cache if the schema has changed"
 
   it "should automatically add a unique index in migrations if explicitly told it's a low-card table" do
+    tn = @table_name
     migrate do
-      drop_table :lctables_spec_user_statuses rescue nil
-      create_table :lctables_spec_user_statuses, :low_card => true do |t|
+      drop_table tn rescue nil
+      create_table tn, :low_card => true do |t|
         t.boolean :deleted, :null => false
         t.boolean :deceased
         t.string :gender, :null => false
@@ -34,7 +36,7 @@ describe LowCardTables do
     end
 
     # This is deliberately *not* a low-card table
-    define_model_class(:UserStatus, 'lctables_spec_user_statuses') { }
+    define_model_class(:UserStatus, @table_name) { }
 
     status_1 = ::UserStatus.create!(:deleted => false, :deceased => false, :gender => 'male', :donation_level => 5)
     # make sure we can create a different one
@@ -46,11 +48,12 @@ describe LowCardTables do
   end
 
   it "should automatically add a unique index in migrations if there's a model saying it's a low-card table" do
-    define_model_class(:UserStatus, 'lctables_spec_user_statuses') { is_low_card_table }
+    define_model_class(:UserStatus, @table_name) { is_low_card_table }
+    tn = @table_name
 
     migrate do
-      drop_table :lctables_spec_user_statuses rescue nil
-      create_table :lctables_spec_user_statuses do |t|
+      drop_table tn rescue nil
+      create_table tn do |t|
         t.boolean :deleted, :null => false
         t.boolean :deceased
         t.string :gender, :null => false
@@ -59,7 +62,7 @@ describe LowCardTables do
     end
 
     # This is deliberately *not* a low-card table
-    define_model_class(:UserStatusBackdoor, 'lctables_spec_user_statuses') { }
+    define_model_class(:UserStatusBackdoor, @table_name) { }
 
     status_1 = ::UserStatusBackdoor.create!(:deleted => false, :deceased => false, :gender => 'male', :donation_level => 5)
     # make sure we can create a different one
@@ -70,10 +73,15 @@ describe LowCardTables do
     }.should raise_error(ActiveRecord::StatementInvalid)
   end
 
-  it "should automatically change the unique index in migrations if explicitly told it's a low-card table" do
+  def check_unique_index_modification(explicit_or_model, common_hash, first, second, third, &block)
+    if explicit_or_model == :model
+      define_model_class(:UserStatus, @table_name) { is_low_card_table }
+    end
+
+    tn = @table_name
     migrate do
-      drop_table :lctables_spec_user_statuses rescue nil
-      create_table :lctables_spec_user_statuses, :low_card => true do |t|
+      drop_table tn rescue nil
+      create_table tn do |t|
         t.boolean :deleted, :null => false
         t.boolean :deceased
         t.string :gender, :null => false
@@ -81,21 +89,39 @@ describe LowCardTables do
       end
     end
 
-    migrate do
-      add_column :lctables_spec_user_statuses, :awesomeness, :integer, :low_card => true
-    end
+    migrate(&block)
 
     # This is deliberately *not* a low-card table
-    define_model_class(:UserStatus, 'lctables_spec_user_statuses') { }
-    ::UserStatus.reset_column_information
+    define_model_class(:UserStatusBackdoor, @table_name) { }
+    ::UserStatusBackdoor.reset_column_information
 
-    status_1 = ::UserStatus.create!(:deleted => false, :deceased => false, :gender => 'male', :donation_level => 5, :awesomeness => 10)
+    status_1 = ::UserStatusBackdoor.create!(common_hash.merge(first))
     # make sure we can create a different one
-    status_2 = ::UserStatus.create!(:deleted => false, :deceased => false, :gender => 'male', :donation_level => 5, :awesomeness => 5)
+    status_2 = ::UserStatusBackdoor.create!(common_hash.merge(second))
     # now, make sure we can't create a duplicate
     lambda {
-      ::UserStatus.create!(:deleted => false, :deceased => false, :gender => 'male', :donation_level => 5, :awesomeness => 10)
+      ::UserStatusBackdoor.create!(common_hash.merge(third))
     }.should raise_error(ActiveRecord::StatementInvalid)
+  end
+
+  it "should automatically change the unique index in migrations if explicitly told it's a low-card table" do
+    tn = @table_name
+    check_unique_index_modification(:explicit, { :deleted => false, :deceased => false, :gender => 'male', :donation_level => 5 },
+      { :awesomeness => 10 },
+      { :awesomeness => 5 },
+      { :awesomeness => 10 }) do
+      add_column tn, :awesomeness, :integer, :low_card => true
+    end
+  end
+
+  it "should automatically change the unique index in migrations if implicitly told it's a low-card table" do
+    tn = @table_name
+    check_unique_index_modification(:model, { :deleted => false, :deceased => false, :gender => 'male', :donation_level => 5 },
+      { :awesomeness => 10 },
+      { :awesomeness => 5 },
+      { :awesomeness => 10 }) do
+      add_column tn, :awesomeness, :integer
+    end
   end
 
 
@@ -108,9 +134,11 @@ describe LowCardTables do
     # Very important: we have to use a different table name here than we've used previously, because there may well
     # still be model class definitions hanging around from other tests, and there's really no good way of excluding
     # them from our code's search for model definitions.
+    tn = @table_name
+
     migrate do
-      drop_table :lctables_spec_user_statuses_2 rescue nil
-      create_table :lctables_spec_user_statuses_2 do |t|
+      drop_table tn rescue nil
+      create_table tn do |t|
         t.boolean :deleted, :null => false
         t.boolean :deceased
         t.string :gender, :null => false
@@ -118,7 +146,7 @@ describe LowCardTables do
       end
     end
 
-    define_model_class(:UserStatus2, 'lctables_spec_user_statuses_2') { is_low_card_table }
+    define_model_class(:UserStatus2, @table_name) { is_low_card_table }
 
     e = nil
     begin
@@ -128,7 +156,7 @@ describe LowCardTables do
     end
 
     e.should be
-    e.message.should match(/lctables_spec_user_statuses_2/mi)
+    e.message.should match(/#{@table_name}/mi)
     e.message.should match(/deceased/mi)
     e.message.should match(/deleted/mi)
     e.message.should match(/gender/mi)
