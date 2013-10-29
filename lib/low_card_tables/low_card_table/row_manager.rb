@@ -253,13 +253,13 @@ The exception we got was:
         raise LowCardTables::Errors::LowCardInvalidLowCardRowsError, message
       end
 
-      def flush_lock_and_create_rows_for!(hashes)
+      def flush_lock_and_create_rows_for!(input)
         with_locked_table do
-          flush!(:creating_rows, :context => :before_import, :new_rows => hashes)
+          flush!(:creating_rows, :context => :before_import, :new_rows => input)
 
-          # because it's possible there was a schema modification that we just now picked up -- we're just using this
-          # for validation, so that it'll blow up if any of these are now no longer complete hashes
-          map_input_to_complete_hashes(hashes)
+          # because it's possible there was a schema modification that we just now picked up
+          input_to_hashes_map = map_input_to_complete_hashes(input)
+          hashes = input_to_hashes_map.values
 
           existing = rows_matching(hashes)
           still_not_found = hashes - existing.keys
@@ -385,17 +385,27 @@ equivalent of 'LOCK TABLE'(s) in your database.}
             raise "Invalid input to this method -- this must be a Hash, or an instance of #{@low_card_model}: #{hash_or_object.inspect}"
           end
 
-          assert_complete_key!(hash)
+          hash = ensure_complete_key(hash)
           out[hash_or_object] = hash
         end
 
         out
       end
 
-      def assert_complete_key!(hash)
+      def ensure_complete_key(hash)
         keys_as_strings = hash.keys.map(&:to_s)
         missing = value_column_names - keys_as_strings
         extra = keys_as_strings - value_column_names
+
+        missing = missing.select do |missing_column_name|
+          column = @low_card_model.columns.detect { |c| c.name.to_s.strip.downcase == missing_column_name.to_s.strip.downcase }
+          if column && column.default
+            hash[column.name] = column.default
+            false
+          else
+            true
+          end
+        end
 
         if missing.length > 0
           raise LowCardTables::Errors::LowCardColumnNotSpecifiedError, "The following is not a complete specification of all columns in low-card table '#{@low_card_model.table_name}'; it is missing these columns: #{missing.join(", ")}: #{hash.inspect}"
@@ -404,6 +414,8 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         if extra.length > 0
           raise LowCardTables::Errors::LowCardColumnNotPresentError, "The following specifies extra columns that are not present in low-card table '#{@low_card_model.table_name}'; these columns are not present in the underlying model: #{extra.join(", ")}: #{hash.inspect}"
         end
+
+        hash
       end
 
       def to_array_of_partial_hashes(array)

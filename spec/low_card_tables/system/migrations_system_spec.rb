@@ -23,8 +23,49 @@ describe LowCardTables do
     end
   end
 
-  it "should handle schema changes to the low-card table"
-  it "should be able to remove low-card columns and automatically update associated rows"
+  def create_user!(name, deleted, deceased, gender, donation_level, awesomeness = nil)
+    user = ::User.new
+    user.name = name
+    user.deleted = deleted
+    user.deceased = deceased
+    user.gender = gender
+    user.donation_level = donation_level
+    user.awesomeness = awesomeness if awesomeness
+    user.save!
+    user
+  end
+
+  it "should handle schema changes to the low-card table" do
+    tn = @table_name
+    migrate do
+      drop_table tn rescue nil
+      create_table tn, :low_card => true do |t|
+        t.boolean :deleted, :null => false
+        t.boolean :deceased
+        t.string :gender, :null => false
+        t.integer :donation_level
+      end
+
+      drop_table :lctables_spec_users rescue nil
+      create_table :lctables_spec_users do |t|
+        t.string :name, :null => false
+        t.integer :user_status_id, :null => false, :limit => 2
+      end
+    end
+
+    define_model_class(:UserStatus, @table_name) { is_low_card_table }
+    define_model_class(:User, :lctables_spec_users) { has_low_card_table :status }
+
+    @user1 = create_user!('User1', false, true, 'male', 5)
+    @user2 = create_user!('User2', false, false, 'female', 5)
+
+    migrate do
+      add_column tn, :awesomeness, :integer, :null => false, :default => 123
+    end
+
+    @user3 = create_user!('User3', false, true, 'male', 10)
+    @user3.awesomeness.should == 123
+  end
 
   it "should throw out the cache if the schema has changed"
 
@@ -170,6 +211,7 @@ describe LowCardTables do
   end
 
   it "should allow removing a column, and thus collapsing rows that are now identical"
+  it "should be able to remove low-card columns and automatically update associated rows"
 
   it "should fail if there is no unique index on a low-card table at startup" do
     tn = @table_name
