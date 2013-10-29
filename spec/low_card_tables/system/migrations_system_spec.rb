@@ -76,8 +76,6 @@ describe LowCardTables do
     @user3_again.awesomeness.should == 345
   end
 
-  it "should throw out the cache if the schema has changed"
-
   it "should automatically add a unique index in migrations if explicitly told it's a low-card table" do
     tn = @table_name
     migrate do
@@ -215,6 +213,44 @@ describe LowCardTables do
             execute "ALTER TABLE #{tn} ADD COLUMN awesomeness INTEGER"
           end
         end
+      end
+    end
+  end
+
+  it "should remove the unique index during #change_low_card_table" do
+    tn = @table_name
+    migrate do
+      drop_table tn rescue nil
+      create_table tn, :low_card => true do |t|
+        t.boolean :deleted, :null => false
+        t.boolean :deceased
+        t.string :gender, :null => false
+        t.integer :donation_level
+      end
+    end
+
+    define_model_class(:UserStatus, @table_name) { is_low_card_table }
+    define_model_class(:User, :lctables_spec_users) { has_low_card_table :status }
+
+    user1 = create_user!('User1', false, false, 'male', 5)
+    status_1 = user1.status
+    status_1_id = user1.user_status_id
+    status_1_id.should > 0
+
+    migrate do
+      change_low_card_table(tn) do
+        status_1_attributes = status_1.attributes.dup
+        status_1_attributes.delete(:id)
+        status_1_attributes.delete("id")
+        $stderr.puts "status_1_attributes: #{status_1_attributes.inspect}"
+
+        new_status = ::UserStatus.new(status_1_attributes)
+        new_status.save_low_card_row!
+
+        new_status.id.should_not == status_1.id
+        new_status.id.should > 0
+
+        ::UserStatus.delete_all("id = #{new_status.id}")
       end
     end
   end
