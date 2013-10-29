@@ -9,12 +9,16 @@ describe LowCardTables do
     @dh = LowCardTables::Helpers::DatabaseHelper.new
     @dh.setup_activerecord!
 
-    @table_name = "lctables_spec_user_statuses_#{rand(1_000_000)}".to_sym
+    # We need to use a different table name for every single spec in this test. That's because one of the things that
+    # migrations take a look at is whether, for a given table, there's a model pointing to it that declares itself as
+    # a low-card model. Once defined, it's impossible to remove these classes from ActiveRecord::Base.descendants,
+    # which is what we use to look for these classes.
+    @table_name = "lctables_sus_#{rand(1_000_000_000)}".to_sym
   end
 
   after :each do
     migrate do
-      drop_table spec_table_name rescue nil
+      drop_table @table_name rescue nil
     end
   end
 
