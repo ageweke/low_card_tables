@@ -6,7 +6,7 @@ module LowCardTables
         @association_name = association_name.to_s
         @options = options
 
-        install_methods!
+        sync_installed_methods!
 
         # call a few methods that will raise errors if things are configured incorrectly;
         # we call them here so that you get those errors immediately, at startup, instead of
@@ -53,12 +53,12 @@ module LowCardTables
       private
       attr_reader :association_name, :options, :model_class
 
-      def install_methods!
+      def sync_installed_methods!
         # We create an anonymous module and include it, so that the class itself can properly override the
         # method and call 'super' if it wants.
-
-        new_module = Module.new
-        new_module.module_eval(%{
+        @methods_module ||= begin
+          out = Module.new
+          out.module_eval(%{
   def #{association_name}
     _low_card_objects_manager.object_for('#{association_name}')
   end
@@ -69,19 +69,33 @@ module LowCardTables
     out
   end})
 
-        low_card_class._low_card_value_column_names.each do |column_name|
-          new_module.module_eval(%{
-  def #{column_name}
-    #{association_name}.#{column_name}
-  end
-
-  def #{column_name}=(x)
-    #{association_name}.#{column_name} = x
-  end
-  })
+          model_class.send(:include, out)
+          out
         end
 
-        model_class.send(:include, new_module)
+        @currently_installed_methods ||= [ ]
+
+        desired_methods = low_card_class._low_card_value_column_names.map(&:to_s)
+        methods_to_install = desired_methods - @currently_installed_methods
+        methods_to_remove = @currently_installed_methods - desired_methods
+
+        methods_to_remove.each do |method_to_remove|
+          @methods_module.module_eval("remove_method :#{method_to_remove}")
+          @methods_module.module_eval("remove_method :#{method_to_remove}=")
+        end
+
+        methods_to_install.each do |method_to_install|
+          @methods_module.module_eval(%{
+  def #{method_to_install}
+    #{association_name}.#{method_to_install}
+  end
+
+  def #{method_to_install}=(x)
+    #{association_name}.#{method_to_install} = x
+  end
+  })
+          @currently_installed_methods << method_to_install
+        end
       end
 
       def get_id_from_model(model_instance)
