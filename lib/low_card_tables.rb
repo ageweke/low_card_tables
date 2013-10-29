@@ -15,6 +15,21 @@ class ActiveRecord::Base
   include LowCardTables::ActiveRecord::Base
 end
 
-module ActiveRecord::ConnectionAdapters::SchemaStatements
-  include LowCardTables::ActiveRecord::Migrations
+class ActiveRecord::Migration
+  def migrate_with_low_card_connection_patching(*args, &block)
+    self.class._low_card_patch_connection_class_if_necessary(connection.class)
+    migrate_without_low_card_connection_patching(*args, &block)
+  end
+
+  alias_method_chain :migrate, :low_card_connection_patching
+
+  class << self
+    def _low_card_patch_connection_class_if_necessary(connection_class)
+      @_low_card_patched_connection_classes = { }
+      @_low_card_patched_connection_classes[connection_class] ||= begin
+        connection_class.send(:include, ::LowCardTables::ActiveRecord::Migrations)
+        true
+      end
+    end
+  end
 end

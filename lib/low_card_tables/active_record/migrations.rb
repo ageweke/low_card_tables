@@ -15,7 +15,6 @@ module LowCardTables
       end
 
       def add_column_with_low_card_support(table_name, column_name, type, options = {})
-        $stderr.puts "HERE!!"
         ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, options) do |new_options|
           add_column_without_low_card_support(table_name, column_name, type, options)
         end
@@ -45,6 +44,7 @@ module LowCardTables
           temporary_model_class = Class.new(::ActiveRecord::Base)
           temporary_model_class.table_name = table_name
           temporary_model_class.class_eval { is_low_card_table }
+          temporary_model_class.reset_column_information
           temporary_model_class
         end
 

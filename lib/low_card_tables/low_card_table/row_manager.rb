@@ -64,7 +64,6 @@ module LowCardTables
 
       def ensure_has_unique_index!(create_if_needed = false)
         current_name = current_unique_all_columns_index_name
-        $stderr.puts "ensure_has_unique_index!: #{current_name.inspect}"
         return current_name if current_name
 
         if create_if_needed
@@ -101,6 +100,7 @@ We're looking for an index on the following columns:
         ideal_name = ideal_unique_all_columns_index_name
 
         block = lambda do
+          remove_index table_name, :name => ideal_name rescue nil
           add_index table_name, column_names, :unique => true, :name => ideal_name
         end
 

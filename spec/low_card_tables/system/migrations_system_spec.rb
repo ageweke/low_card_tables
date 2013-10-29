@@ -81,11 +81,9 @@ describe LowCardTables do
       end
     end
 
-    $stderr.puts "ADDING COLUMN..."
     migrate do
       add_column :lctables_spec_user_statuses, :awesomeness, :integer, :low_card => true
     end
-    $stderr.puts "ADDED COLUMN."
 
     # This is deliberately *not* a low-card table
     define_model_class(:UserStatus, 'lctables_spec_user_statuses') { }
