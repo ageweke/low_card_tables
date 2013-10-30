@@ -30,6 +30,8 @@ describe LowCardTables do
     out
   end
 
+  it "should have an explicit cache-flush call that works"
+
   it "should cache low-card rows in memory" do
     LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
       spy.call_count.should == 0

@@ -21,6 +21,7 @@ describe LowCardTables do
     tn = @table_name
     migrate do
       drop_table tn rescue nil
+      drop_table :lctables_spec_users rescue nil
     end
   end
 
@@ -325,6 +326,161 @@ describe LowCardTables do
 
     [ ::User.find(user1.id), ::User.find(user2.id), ::User.find(user3.id) ].map(&:user_status_id).uniq.length.should == 1 # all the same
     [ ::User.find(user1.id), ::User.find(user4.id), ::User.find(user5.id) ].map(&:user_status_id).uniq.length.should == 3 # all different
+  end
+
+  it "should update all associated tables, including multiple references to the same low-card table, in chunks as specified, when a column is removed" do
+    tn = @table_name
+    migrate do
+      drop_table tn rescue nil
+      create_table tn, :low_card => true do |t|
+        t.boolean :deleted, :null => false
+        t.boolean :deceased
+        t.string :gender, :null => false
+        t.integer :donation_level
+      end
+
+      drop_table :lctables_spec_users rescue nil
+      create_table :lctables_spec_users do |t|
+        t.string :name, :null => false
+        t.integer :user_status_id, :null => false, :limit => 2
+        t.integer :other_status_id, :null => false, :limit => 2
+      end
+
+      drop_table :lctables_spec_admins rescue nil
+      create_table :lctables_spec_admins do |t|
+        t.string :name, :null => false
+        t.integer :admin_status_id, :null => false, :limit => 2
+      end
+    end
+
+    define_model_class(:UserStatus, @table_name) { is_low_card_table }
+    define_model_class(:User, :lctables_spec_users) do
+      has_low_card_table :status
+      has_low_card_table :other_status, :class => ::UserStatus, :foreign_key => :other_status_id
+    end
+    define_model_class(:Admin, :lctables_spec_admins) { has_low_card_table :status, :class => ::UserStatus, :foreign_key => :admin_status_id }
+
+    ::User.low_card_value_collapsing_update_scheme 10
+
+    class ::Admin
+      class << self
+        def low_card_called(x)
+          @low_card_calls ||= [ ]
+          @low_card_calls << x
+        end
+
+        def low_card_calls
+          @low_card_calls
+        end
+      end
+
+      low_card_value_collapsing_update_scheme(lambda { |map| ::Admin.low_card_called(map) })
+    end
+
+    all_users = [ ]
+    50.times do
+      new_user = ::User.new
+
+      new_user.name = "User#{rand(1_000_000_000)}"
+
+      new_user.status.deleted = !! (rand(2) == 0)
+      new_user.status.deceased = !! (rand(2) == 0)
+      new_user.status.gender = case rand(3); when 0 then 'female'; when 1 then 'male'; when 2 then 'other'; end
+      new_user.status.donation_level = rand(10)
+
+      new_user.other_status.deleted = !! (rand(2) == 0)
+      new_user.other_status.deceased = !! (rand(2) == 0)
+      new_user.other_status.gender = case rand(3); when 0 then 'female'; when 1 then 'male'; when 2 then 'other'; end
+      new_user.other_status.donation_level = rand(10)
+
+      new_user.save!
+
+      all_users << new_user
+    end
+
+    all_admins = [ ]
+    25.times do
+      new_admin = Admin.new
+
+      new_admin.name = "Admin#{rand(1_000_000_000)}"
+
+      new_admin.deleted = !! (rand(2) == 0)
+      new_admin.deceased = !! (rand(2) == 0)
+      new_admin.gender = case rand(3); when 0 then 'female'; when 1 then 'male'; when 2 then 'other'; end
+      new_admin.donation_level = rand(10)
+
+      new_admin.save!
+
+      all_admins << new_admin
+    end
+
+    define_model_class(:UserStatusBackdoor, @table_name) { }
+    # The count will depend on randomization, but the chance of us generating fewer than 30 distinct rows should be
+    # extremely low -- there are 120 possible (2 deleted * 2 deceased * 3 genders * 10 donation_levels)
+    ::UserStatusBackdoor.count.should > 30
+    ::UserStatusBackdoor.count.should <= 120
+
+    class UpdateCollector
+      attr_reader :updates
+
+      def initialize
+        @updates = [ ]
+      end
+
+      def call(name, start, finish, message_id, values)
+        sql = values[:sql]
+        @updates << values[:sql] if sql =~ /^\s*UPDATE\s+/
+      end
+    end
+    collector = UpdateCollector.new
+
+    ::ActiveSupport::Notifications.subscribe('sql.active_record', collector)
+
+    migrate do
+      remove_column tn, :donation_level
+    end
+
+    # The count will depend on randomization, but the chance of us generating fewer than 6 distinct rows should be
+    # extremely low -- there are 120 possible (2 deleted * 2 deceased * 3 genders)
+    ::UserStatusBackdoor.count.should >= 6
+    ::UserStatusBackdoor.count.should <= 12
+
+    all_user_status_ids = ::UserStatusBackdoor.all.map(&:id)
+
+    ::User.all.each do |verify_user|
+      orig_user = all_users.detect { |u| u.id == verify_user.id }
+
+      verify_user.status.deleted.should == orig_user.status.deleted
+      verify_user.status.deceased.should == orig_user.status.deceased
+      verify_user.status.gender.should == orig_user.status.gender
+      verify_user.status.respond_to?(:donation_level).should_not be
+      verify_user.respond_to?(:donation_level).should_not be
+    end
+
+    new_admin_status_ids = ::Admin.all.sort_by(&:id).map(&:admin_status_id)
+    orig_admin_status_ids = all_admins.sort_by(&:id).map(&:admin_status_id)
+
+    new_admin_status_ids.should == orig_admin_status_ids # no change
+
+    admin_change_maps = ::Admin.low_card_calls
+    admin_change_maps.length.should == 1
+
+    admin_change_maps[0].each do |new_row, old_rows|
+      old_rows.length.should >= 1
+      old_rows.each do |old_row|
+        old_row.deleted.should == new_row.deleted
+        old_row.deceased.should == new_row.deceased
+        old_row.gender.should == new_row.gender
+      end
+    end
+
+    collapses = admin_change_maps[0].size
+    expected_update_count = collapses
+    expected_update_count *= 2 # one for each column in the table
+    expected_update_count *= 5 # 50 rows in batches of 10
+
+    user_updates = collector.updates.select { |u| u =~ /lctables_spec_users/ }
+    user_updates.length.should == expected_update_count
   end
 
   it "should fail if there is no unique index on a low-card table at startup" do

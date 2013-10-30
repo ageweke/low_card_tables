@@ -166,4 +166,6 @@ describe LowCardTables do
     row.gender.should == 'unknown'
     row.donation_level.should == 5
   end
+
+  it "should have an explicit 'assign the low-card ID now' call"
 end

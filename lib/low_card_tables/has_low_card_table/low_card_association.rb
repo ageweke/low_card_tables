@@ -74,7 +74,7 @@ module LowCardTables
           out = options[:class] || "#{model_class.name.underscore.singularize}_#{association_name}"
 
           out = out.to_s if out.kind_of?(Symbol)
-          out = out.camelize
+          out = out.camelize if out.kind_of?(String)
 
           if out.kind_of?(String)
             begin
@@ -160,7 +160,7 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
       def update_collapsed_rows_batch(starting_id, row_chunk_size, collapse_map)
         starting_at_starting_id = model_class.where("#{model_class.primary_key} >= :starting_id", :starting_id => starting_id)
 
-        one_past_ending_row = starting_at_starting_id.order("#{model_class.primary_key} ASC").offset(row_chunk_size + 1).first
+        one_past_ending_row = starting_at_starting_id.order("#{model_class.primary_key} ASC").offset(row_chunk_size).first
         one_past_ending_id = one_past_ending_row.id if one_past_ending_row
 
         base_scope = starting_at_starting_id
