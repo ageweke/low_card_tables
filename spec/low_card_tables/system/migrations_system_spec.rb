@@ -24,13 +24,13 @@ describe LowCardTables do
     end
   end
 
-  def create_user!(name, deleted, deceased, gender, donation_level, awesomeness = nil)
+  def create_user!(name, deleted, deceased, gender, donation_level = nil, awesomeness = nil)
     user = ::User.new
     user.name = name
     user.deleted = deleted
     user.deceased = deceased
     user.gender = gender
-    user.donation_level = donation_level
+    user.donation_level = donation_level if donation_level
     user.awesomeness = awesomeness if awesomeness
     user.save!
     user
@@ -61,20 +61,28 @@ describe LowCardTables do
     @user2 = create_user!('User2', false, false, 'female', 5)
 
     migrate do
+      remove_column tn, :donation_level
       add_column tn, :awesomeness, :integer, :null => false, :default => 123
     end
 
     ::UserStatus.reset_column_information
-    @user3 = create_user!('User3', false, true, 'male', 10)
+    @user3 = create_user!('User3', false, true, 'male', nil)
     @user3.status.awesomeness.should == 123
     @user3.awesomeness.should == 123
 
     @user3.awesomeness = 345
+
+    @user3.respond_to?(:donation_level).should_not be
+    @user3.respond_to?(:donation_level=).should_not be
+
     @user3.save!
 
     @user3_again = ::User.find(@user3.id)
     @user3_again.status.awesomeness.should == 345
     @user3_again.awesomeness.should == 345
+
+    @user3_again.respond_to?(:donation_level).should_not be
+    @user3_again.respond_to?(:donation_level=).should_not be
   end
 
   it "should automatically add a unique index in migrations if explicitly told it's a low-card table" do
