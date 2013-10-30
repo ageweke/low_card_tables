@@ -133,6 +133,11 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
         @currently_installed_methods ||= [ ]
 
         desired_methods = low_card_class._low_card_value_column_names.map(&:to_s)
+        model_instance_methods = model_class.instance_methods(true).map(&:to_s)
+        desired_methods = desired_methods.select do |method_name|
+          (! model_instance_methods.include?(method_name))
+        end
+
         methods_to_install = desired_methods - @currently_installed_methods
         methods_to_remove = @currently_installed_methods - desired_methods
 
