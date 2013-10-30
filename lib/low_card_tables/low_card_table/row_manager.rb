@@ -95,6 +95,15 @@ module LowCardTables
         ids_to_delete = collapse_map.values.map { |row_array| row_array.map(&:id) }.flatten
         @low_card_model.delete_all([ "id IN (:ids)", :ids => ids_to_delete ])
 
+        all_referring_models = referring_models | (additional_referring_models || [ ])
+        transaction_models = all_referring_models + [ @low_card_model ]
+
+        transactions_on(transaction_models) do
+          all_referring_models.each do |referring_model|
+            referring_model._low_card_update_collapsed_rows(@low_card_model, collapse_map)
+          end
+        end
+
         flush!(:collapse_rows_and_update_referrers)
       end
 
@@ -144,6 +153,15 @@ We're looking for an index on the following columns:
       end
 
       private
+      def transactions_on(transaction_models, &block)
+        if transaction_models.length == 0
+          block.call
+        else
+          model = transaction_models.shift
+          model.transaction { transactions_on(transaction_models, &block) }
+        end
+      end
+
       def value_attributes(row)
         attributes = row.attributes
         out = { }

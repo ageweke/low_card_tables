@@ -101,7 +101,7 @@ module LowCardTables
         # rows into memory.
         read_rows_time = current_time
 
-        raw_rows = @model_class.order("#{@model_class.primary_key} ASC").limit(max_row_count + 1).all
+        raw_rows = @model_class.order("#{@model_class.primary_key} ASC").limit(max_row_count + 1).to_a
         raise_too_many_rows_error if raw_rows.length > max_row_count
 
         out = { }

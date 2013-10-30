@@ -13,6 +13,7 @@ module LowCardTables
 
         @model_class = model_class
         @associations = { }
+        @collapsing_update_scheme = :default
 
         install_methods!
       end
@@ -44,6 +45,34 @@ module LowCardTables
       def _low_card_update_values(model_instance)
         @associations.values.each do |association|
           association.update_value_before_save!(model_instance)
+        end
+      end
+
+      DEFAULT_COLLAPSING_UPDATE_VALUE = 10_000
+
+      def low_card_value_collapsing_update_scheme(new_scheme)
+        if (! new_scheme)
+          @collapsing_update_scheme
+        elsif new_scheme == :default
+          @collapsing_update_scheme = new_scheme
+        elsif new_scheme.kind_of?(Integer)
+          raise ArgumentError, "You must specify an integer >= 1, not #{new_scheme.inspect}" unless new_scheme >= 1
+          @collapsing_update_scheme = new_scheme
+        elsif new_scheme.respond_to?(:call)
+          @collapsing_update_scheme = new_scheme
+        else
+          raise ArgumentError, "Invalid collapsing update scheme: #{new_scheme.inspect}"
+        end
+      end
+
+      def _low_card_update_collapsed_rows(low_card_model, collapse_map)
+        update_scheme = @collapsing_update_scheme
+        update_scheme = DEFAULT_COLLAPSING_UPDATE_VALUE if update_scheme == :default
+
+        @associations.values.each do |association|
+          if association.low_card_class == low_card_model
+            association.update_collapsed_rows(collapse_map, update_scheme)
+          end
         end
       end
 

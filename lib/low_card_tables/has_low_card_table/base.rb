@@ -17,6 +17,14 @@ module LowCardTables
         def _low_card_association(name)
           _low_card_associations_manager._low_card_association(name)
         end
+
+        def _low_card_update_collapsed_rows(low_card_model, collapse_map)
+          _low_card_associations_manager._low_card_update_collapsed_rows(low_card_model, collapse_map)
+        end
+
+        def low_card_value_collapsing_update_scheme(new_scheme = nil)
+          _low_card_associations_manager.low_card_value_collapsing_update_scheme(new_scheme)
+        end
       end
 
       def _low_card_update_values

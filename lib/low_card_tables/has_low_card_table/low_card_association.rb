@@ -34,6 +34,20 @@ module LowCardTables
         out
       end
 
+      def update_collapsed_rows(collapse_map, collapsing_update_scheme)
+        if collapsing_update_scheme.respond_to?(:call)
+          collapsing_update_scheme.call(collapse_map)
+        else
+          row_chunk_size = collapsing_update_scheme
+          current_id = @model_class.order("#{@model_class.primary_key} ASC").first.id
+
+          while true
+            current_id = update_collapsed_rows_batch(current_id, row_chunk_size, collapse_map)
+            break if (! current_id)
+          end
+        end
+      end
+
       def update_value_before_save!(model_instance)
         hash = { }
 
@@ -92,6 +106,7 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
           out
         end
       end
+
       private
       attr_reader :association_name, :options, :model_class
 
@@ -140,6 +155,23 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
   })
           @currently_installed_methods << method_to_install
         end
+      end
+
+      def update_collapsed_rows_batch(starting_id, row_chunk_size, collapse_map)
+        starting_at_starting_id = model_class.where("#{model_class.primary_key} >= :starting_id", :starting_id => starting_id)
+
+        one_past_ending_row = starting_at_starting_id.order("#{model_class.primary_key} ASC").offset(row_chunk_size + 1).first
+        one_past_ending_id = one_past_ending_row.id if one_past_ending_row
+
+        base_scope = starting_at_starting_id
+        base_scope = base_scope.where("#{model_class.primary_key} < :one_past_ending_id", :one_past_ending_id => one_past_ending_id) if one_past_ending_id
+
+        collapse_map.each do |collapse_to, collapse_from_array|
+          base_scope.update_all([ "#{foreign_key_column_name} = :collapse_to", :collapse_to => collapse_to.id ],
+            [ "#{foreign_key_column_name} IN (:collapse_from)", :collapse_from => collapse_from_array.map(&:id) ])
+        end
+
+        one_past_ending_id
       end
 
       def get_id_from_model(model_instance)

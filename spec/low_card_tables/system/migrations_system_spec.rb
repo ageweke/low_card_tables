@@ -228,6 +228,12 @@ describe LowCardTables do
         t.string :gender, :null => false
         t.integer :donation_level
       end
+
+      drop_table :lctables_spec_users rescue nil
+      create_table :lctables_spec_users do |t|
+        t.string :name, :null => false
+        t.integer :user_status_id, :null => false, :limit => 2
+      end
     end
 
     define_model_class(:UserStatus, @table_name) { is_low_card_table }
@@ -264,6 +270,12 @@ describe LowCardTables do
         t.boolean :deceased
         t.string :gender, :null => false
         t.integer :donation_level
+      end
+
+      drop_table :lctables_spec_users rescue nil
+      create_table :lctables_spec_users do |t|
+        t.string :name, :null => false
+        t.integer :user_status_id, :null => false, :limit => 2
       end
     end
 
@@ -303,8 +315,8 @@ describe LowCardTables do
     user5_status.deceased.should == true
     user5_status.gender.should == 'male'
 
-    [ user1, user2, user3 ].map(&:user_status_id).uniq.length.should == 3 # all different
-    [ user1, user4, user5 ].map(&:user_status_id).uniq.length.should == 1 # all the same
+    [ ::User.find(user1.id), ::User.find(user2.id), ::User.find(user3.id) ].map(&:user_status_id).uniq.length.should == 1 # all the same
+    [ ::User.find(user1.id), ::User.find(user4.id), ::User.find(user5.id) ].map(&:user_status_id).uniq.length.should == 3 # all different
   end
 
   it "should fail if there is no unique index on a low-card table at startup" do
