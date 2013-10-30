@@ -52,8 +52,7 @@ module LowCardTables
           low_card_option = options.delete(:low_card)
           low_card_model = existing_low_card_model_for(table_name)
 
-          model_class_to_use = temporary_model_class_for(table_name)
-
+          model_class_to_use = low_card_model || temporary_model_class_for(table_name)
           is_low_card = (low_card_option || low_card_model)
 
           begin

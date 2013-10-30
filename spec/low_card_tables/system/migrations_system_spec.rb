@@ -255,8 +255,57 @@ describe LowCardTables do
     end
   end
 
-  it "should allow removing a column, and thus collapsing rows that are now identical"
-  it "should be able to remove low-card columns and automatically update associated rows"
+  it "should be able to remove low-card columns, collapse now-identical rows, and automatically update associated rows" do
+    tn = @table_name
+    migrate do
+      drop_table tn rescue nil
+      create_table tn, :low_card => true do |t|
+        t.boolean :deleted, :null => false
+        t.boolean :deceased
+        t.string :gender, :null => false
+        t.integer :donation_level
+      end
+    end
+
+    define_model_class(:UserStatus, @table_name) { is_low_card_table }
+    define_model_class(:User, :lctables_spec_users) { has_low_card_table :status }
+
+    user1 = create_user!('User1', false, false, 'male', 5)
+    user2 = create_user!('User2', false, false, 'male', 10)
+    user3 = create_user!('User3', false, false, 'male', 7)
+    user4 = create_user!('User4', false, false, 'female', 5)
+    user5 = create_user!('User5', false, true, 'male', 5)
+
+    # Make sure they all have unique status IDs
+    [ user1, user2, user3, user4, user5 ].map(&:user_status_id).uniq.length.should == 5
+
+    define_model_class(:UserStatusBackdoor, @table_name) { }
+    ::UserStatusBackdoor.count.should == 5
+
+    migrate do
+      remove_column tn, :donation_level
+    end
+
+    [ user1, user2, user3 ].map(&:user_status_id).uniq.length.should == 3 # all different
+    [ user1, user4, user5 ].map(&:user_status_id).uniq.length.should == 1 # all the same
+
+    ::UserStatusBackdoor.count.should == 3
+
+    user123_status = ::UserStatusBackdoor.find(user1.user_status_id)
+    user123_status.deleted.should == false
+    user123_status.deceased.should == false
+    user123_status.gender.should == 'male'
+
+    user4_status = ::UserStatusBackdoor.find(user4.user_status_id)
+    user4_status.deleted.should == false
+    user4_status.deceased.should == false
+    user4_status.gender.should == 'female'
+
+    user5_status = ::UserStatusBackdoor.find(user5.user_status_id)
+    user5_status.deleted.should == false
+    user5_status.deceased.should == true
+    user5_status.gender.should == 'male'
+  end
 
   it "should fail if there is no unique index on a low-card table at startup" do
     tn = @table_name
