@@ -286,9 +286,6 @@ describe LowCardTables do
       remove_column tn, :donation_level
     end
 
-    [ user1, user2, user3 ].map(&:user_status_id).uniq.length.should == 3 # all different
-    [ user1, user4, user5 ].map(&:user_status_id).uniq.length.should == 1 # all the same
-
     ::UserStatusBackdoor.count.should == 3
 
     user123_status = ::UserStatusBackdoor.find(user1.user_status_id)
@@ -305,6 +302,9 @@ describe LowCardTables do
     user5_status.deleted.should == false
     user5_status.deceased.should == true
     user5_status.gender.should == 'male'
+
+    [ user1, user2, user3 ].map(&:user_status_id).uniq.length.should == 3 # all different
+    [ user1, user4, user5 ].map(&:user_status_id).uniq.length.should == 1 # all the same
   end
 
   it "should fail if there is no unique index on a low-card table at startup" do

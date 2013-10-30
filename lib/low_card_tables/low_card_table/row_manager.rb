@@ -73,6 +73,31 @@ module LowCardTables
         value_columns.map(&:name)
       end
 
+      def collapse_rows_and_update_referrers!(additional_referring_models = nil)
+        attributes_to_rows_map = { }
+        @low_card_model.all.sort_by(&:id).each do |row|
+          attributes = value_attributes(row)
+
+          attributes_to_rows_map[attributes] ||= [ ]
+          attributes_to_rows_map[attributes] << row
+        end
+
+        collapse_map = { }
+        attributes_to_rows_map.each do |attributes, rows|
+          if rows.length > 1
+            winner = rows.shift
+            losers = rows
+
+            collapse_map[winner] = losers
+          end
+        end
+
+        ids_to_delete = collapse_map.values.map { |row_array| row_array.map(&:id) }.flatten
+        @low_card_model.delete_all([ "id IN (:ids)", :ids => ids_to_delete ])
+
+        flush!(:collapse_rows_and_update_referrers)
+      end
+
       def ensure_has_unique_index!(create_if_needed = false)
         current_name = current_unique_all_columns_index_name
         return current_name if current_name
@@ -119,6 +144,13 @@ We're looking for an index on the following columns:
       end
 
       private
+      def value_attributes(row)
+        attributes = row.attributes
+        out = { }
+        value_column_names.each { |n| out[n] = attributes[n] }
+        out
+      end
+
       def migrate(&block)
         migration_class = Class.new(::ActiveRecord::Migration)
         metaclass = migration_class.class_eval { class << self; self; end }
@@ -184,6 +216,8 @@ We're looking for an index on the following columns:
         end
       end
 
+
+
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
 
       def do_matching(hash_or_hashes, block, method_name)
@@ -232,7 +266,6 @@ but we got back these rows:
         end
       end
 
-      # effectively private
       def value_columns
         @low_card_model.columns.select do |column|
           column_name = column.name.to_s.strip.downcase

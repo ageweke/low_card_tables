@@ -124,6 +124,8 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
         methods_to_remove.each do |method_to_remove|
           @methods_module.module_eval("remove_method :#{method_to_remove}")
           @methods_module.module_eval("remove_method :#{method_to_remove}=")
+
+          @currently_installed_methods -= [ method_to_remove ]
         end
 
         methods_to_install.each do |method_to_install|

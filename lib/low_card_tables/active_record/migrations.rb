@@ -50,6 +50,7 @@ module LowCardTables
         def verify_unique_index_as_needed(table_name, options = { }, &block)
           options = (options || { }).dup
           low_card_option = options.delete(:low_card)
+          low_card_referrers = options.delete(:low_card_referrers)
           low_card_model = existing_low_card_model_for(table_name)
 
           model_class_to_use = low_card_model || temporary_model_class_for(table_name)
@@ -61,6 +62,7 @@ module LowCardTables
           ensure
             if is_low_card
               model_class_to_use.reset_column_information
+              model_class_to_use.low_card_collapse_rows_and_update_referrers!(low_card_referrers)
               model_class_to_use._low_card_ensure_has_unique_index!(true)
             end
           end
