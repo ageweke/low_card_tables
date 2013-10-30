@@ -2,7 +2,7 @@ require 'low_card_tables'
 require 'low_card_tables/helpers/database_helper'
 require 'low_card_tables/helpers/system_helpers'
 
-describe LowCardTables do
+describe "LowCardTables association options" do
   include LowCardTables::Helpers::SystemHelpers
 
   before :each do

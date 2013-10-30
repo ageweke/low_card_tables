@@ -42,7 +42,7 @@ module LowCardTables
         @associations[name.to_s] || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{name}' for #{@model_class.name}; there are associations named: #{@associations.keys.sort.join(", ")}.")
       end
 
-      def _low_card_update_values(model_instance)
+      def low_card_update_foreign_keys!(model_instance)
         @associations.values.each do |association|
           association.update_value_before_save!(model_instance)
         end
@@ -78,7 +78,7 @@ module LowCardTables
 
       private
       def install_methods!
-        @model_class.send(:before_save, :_low_card_update_values)
+        @model_class.send(:before_save, :low_card_update_foreign_keys!)
       end
 
       def superclasses(c)

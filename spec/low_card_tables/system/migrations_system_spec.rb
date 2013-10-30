@@ -3,7 +3,7 @@ require 'low_card_tables/helpers/database_helper'
 require 'low_card_tables/helpers/system_helpers'
 require 'pry'
 
-describe LowCardTables do
+describe "LowCardTables migration support" do
   include LowCardTables::Helpers::SystemHelpers
 
   before :each do

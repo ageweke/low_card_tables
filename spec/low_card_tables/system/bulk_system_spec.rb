@@ -3,7 +3,7 @@ require 'low_card_tables/helpers/database_helper'
 require 'low_card_tables/helpers/system_helpers'
 require 'low_card_tables/helpers/query_spy_helper'
 
-describe LowCardTables do
+describe "LowCardTables bulk operations" do
   include LowCardTables::Helpers::SystemHelpers
 
   before :each do

@@ -2,7 +2,7 @@ require 'low_card_tables'
 require 'low_card_tables/helpers/database_helper'
 require 'low_card_tables/helpers/system_helpers'
 
-describe LowCardTables do
+describe "LowCardTables basic operations" do
   include LowCardTables::Helpers::SystemHelpers
 
   before :each do
@@ -112,6 +112,36 @@ describe LowCardTables do
       user1_v2.deleted.should == false
       user2_v2.deleted.should == true
     end
+
+    it "should have an explicit 'assign the low-card ID now' call" do
+      user2 = ::User.new
+      user2.name = 'User2'
+      user2.deleted = false
+      user2.deceased = false
+      user2.gender = 'female'
+      user2.donation_level = 3
+
+      user2.low_card_update_foreign_keys!
+      user2.user_status_id.should be
+      user2.user_status_id.should > 0
+      user2.user_status_id.should == @user1.user_status_id
+
+      ::UserStatusBackdoor.count.should == 1
+
+      user2 = ::User.new
+      user2.name = 'User2'
+      user2.deleted = false
+      user2.deceased = false
+      user2.gender = 'female'
+      user2.donation_level = 9
+
+      user2.low_card_update_foreign_keys!
+      user2.user_status_id.should be
+      user2.user_status_id.should > 0
+      user2.user_status_id.should_not == @user1.user_status_id
+
+      ::UserStatusBackdoor.count.should == 2
+    end
   end
 
   it "should handle column default values in exactly the same way as ActiveRecord" do
@@ -166,6 +196,4 @@ describe LowCardTables do
     row.gender.should == 'unknown'
     row.donation_level.should == 5
   end
-
-  it "should have an explicit 'assign the low-card ID now' call"
 end

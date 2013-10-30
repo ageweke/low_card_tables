@@ -3,7 +3,7 @@ require 'low_card_tables/helpers/database_helper'
 require 'low_card_tables/helpers/system_helpers'
 require 'low_card_tables/helpers/query_spy_helper'
 
-describe LowCardTables do
+describe "LowCardTables caching" do
   include LowCardTables::Helpers::SystemHelpers
 
   before :each do
@@ -30,7 +30,22 @@ describe LowCardTables do
     out
   end
 
-  it "should have an explicit cache-flush call that works"
+  it "should have an explicit cache-flush call that works" do
+    LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
+      create_basic_user("User1")
+
+      mid_count = spy.call_count
+
+      create_basic_user("User2")
+
+      spy.call_count.should == mid_count
+
+      ::UserStatus.low_card_flush_cache!
+      create_basic_user("User3")
+
+      spy.call_count.should > mid_count
+    end
+  end
 
   it "should cache low-card rows in memory" do
     LowCardTables::Helpers::QuerySpyHelper.with_query_spy("lctables_spec_user_statuses") do |spy|
@@ -213,6 +228,28 @@ describe LowCardTables do
       new_call[:finished].should >= new_call[:started]
       new_call[:finished].should <= end_time
       new_call[:data][:reason].should == :manually_requested
+      new_call[:data][:low_card_model].should == ::UserStatus
+    end
+
+    it "should notify listeners when the cache is flushed because an ID was not found" do
+      user1 = create_basic_user
+      call_count = @cache_listener.calls.length
+
+      start_time = Time.now
+      lambda do
+        ::UserStatus.low_card_rows_for_ids([ user1.user_status_id, user1.user_status_id + 1000 ])
+      end.should raise_error(LowCardTables::Errors::LowCardIdNotFoundError)
+
+      new_calls = @cache_listener.calls[call_count..-1]
+      end_time = Time.now
+
+      new_calls.length.should > 1
+      new_call = new_calls.detect { |c| c[:name] == 'low_card_tables.cache_flush' && c[:data][:reason] == :id_not_found }
+      new_call[:name].should == 'low_card_tables.cache_flush'
+      new_call[:started].should >= start_time
+      new_call[:finished].should >= new_call[:started]
+      new_call[:finished].should <= end_time
+      new_call[:data][:reason].should == :id_not_found
       new_call[:data][:low_card_model].should == ::UserStatus
     end
 

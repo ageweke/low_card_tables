@@ -27,8 +27,8 @@ module LowCardTables
         end
       end
 
-      def _low_card_update_values
-        self.class._low_card_associations_manager._low_card_update_values(self)
+      def low_card_update_foreign_keys!
+        self.class._low_card_associations_manager.low_card_update_foreign_keys!(self)
       end
 
       def _low_card_objects_manager
