@@ -70,7 +70,7 @@ module LowCardTables
       end
 
       def value_column_names
-        @value_column_names ||= value_columns.map(&:name)
+        value_columns.map(&:name)
       end
 
       def ensure_has_unique_index!(create_if_needed = false)
@@ -234,7 +234,7 @@ but we got back these rows:
 
       # effectively private
       def value_columns
-        @value_columns ||= @low_card_model.columns.select do |column|
+        @low_card_model.columns.select do |column|
           column_name = column.name.to_s.strip.downcase
 
           use = true
@@ -487,8 +487,6 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         if @cache
           instrument('cache_flush', notification_options.merge(:reason => reason)) do
             @cache = nil
-            @value_columns = nil
-            @value_column_names = nil
           end
         end
 

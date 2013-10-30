@@ -64,11 +64,8 @@ describe LowCardTables do
       add_column tn, :awesomeness, :integer, :null => false, :default => 123
     end
 
-    # binding.pry
     ::UserStatus.reset_column_information
-    cols = ::UserStatus.columns
     @user3 = create_user!('User3', false, true, 'male', 10)
-    # sleep 1_000_000
     @user3.status.awesomeness.should == 123
     @user3.awesomeness.should == 123
 

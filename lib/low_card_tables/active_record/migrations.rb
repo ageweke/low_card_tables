@@ -57,10 +57,13 @@ module LowCardTables
           is_low_card = (low_card_option || low_card_model)
 
           begin
-            # model_class_to_use._low_card_remove_unique_index! if is_low_card
+            model_class_to_use._low_card_remove_unique_index! if is_low_card
             result = block.call(options)
           ensure
-            model_class_to_use._low_card_ensure_has_unique_index!(true) if is_low_card
+            if is_low_card
+              model_class_to_use.reset_column_information
+              model_class_to_use._low_card_ensure_has_unique_index!(true)
+            end
           end
 
           result
