@@ -108,6 +108,8 @@ module LowCardTables
       end
 
       def ensure_has_unique_index!(create_if_needed = false)
+        return unless @low_card_model.table_exists?
+
         current_name = current_unique_all_columns_index_name
         return current_name if current_name
 
@@ -285,6 +287,8 @@ but we got back these rows:
       end
 
       def value_columns
+        return [ ] unless @low_card_model.table_exists?
+
         @low_card_model.columns.select do |column|
           column_name = column.name.to_s.strip.downcase
 

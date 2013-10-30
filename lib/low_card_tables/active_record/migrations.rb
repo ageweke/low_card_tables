@@ -56,13 +56,22 @@ module LowCardTables
           model_class_to_use = low_card_model || temporary_model_class_for(table_name)
           is_low_card = (low_card_option || low_card_model)
 
+          model_class_to_use.reset_column_information
+          previous_columns = model_class_to_use._low_card_value_column_names
+
           begin
             model_class_to_use._low_card_remove_unique_index! if is_low_card
             result = block.call(options)
           ensure
             if is_low_card
+              model_class_to_use.connection.schema_cache.clear!
               model_class_to_use.reset_column_information
-              model_class_to_use.low_card_collapse_rows_and_update_referrers!(low_card_referrers)
+              new_columns = model_class_to_use._low_card_value_column_names
+
+              if (previous_columns - new_columns).length > 0
+                model_class_to_use.low_card_collapse_rows_and_update_referrers!(low_card_referrers)
+              end
+
               model_class_to_use._low_card_ensure_has_unique_index!(true)
             end
           end
