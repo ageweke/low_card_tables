@@ -133,10 +133,12 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
         @currently_installed_methods ||= [ ]
 
         desired_methods = low_card_class._low_card_value_column_names.map(&:to_s)
-        model_instance_methods = model_class.instance_methods(true).map(&:to_s)
-        desired_methods = desired_methods.select do |method_name|
-          (! model_instance_methods.include?(method_name))
+        model_instance_methods = model_class.instance_methods(true).map(&:to_s) - @currently_installed_methods
+        already_existing_methods = desired_methods.select do |method_name|
+          model_instance_methods.include?(method_name)
         end
+
+        desired_methods -= already_existing_methods
 
         methods_to_install = desired_methods - @currently_installed_methods
         methods_to_remove = @currently_installed_methods - desired_methods
@@ -172,8 +174,8 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
         base_scope = base_scope.where("#{model_class.primary_key} < :one_past_ending_id", :one_past_ending_id => one_past_ending_id) if one_past_ending_id
 
         collapse_map.each do |collapse_to, collapse_from_array|
-          base_scope.update_all([ "#{foreign_key_column_name} = :collapse_to", :collapse_to => collapse_to.id ],
-            [ "#{foreign_key_column_name} IN (:collapse_from)", :collapse_from => collapse_from_array.map(&:id) ])
+          base_scope.update_all([ "#{foreign_key_column_name} = :collapse_to", { :collapse_to => collapse_to.id } ],
+            [ "#{foreign_key_column_name} IN (:collapse_from)", { :collapse_from => collapse_from_array.map(&:id) } ])
         end
 
         one_past_ending_id

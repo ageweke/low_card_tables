@@ -93,7 +93,7 @@ module LowCardTables
         end
 
         ids_to_delete = collapse_map.values.map { |row_array| row_array.map(&:id) }.flatten
-        @low_card_model.delete_all([ "id IN (:ids)", :ids => ids_to_delete ])
+        @low_card_model.delete_all([ "id IN (:ids)", { :ids => ids_to_delete } ])
 
         all_referring_models = referring_models | (additional_referring_models || [ ])
         transaction_models = all_referring_models + [ @low_card_model ]
