@@ -61,6 +61,34 @@ describe "LowCardTables association options" do
     user1_again.old_status.donation_level.should == 3
   end
 
+  it "should not blow away methods that are already there, in the class itself, but still allow calls to super" do
+    define_model_class(:UserTest, :lctables_spec_users) do
+      def deleted
+        [ @_other_deleted, super ]
+      end
+
+      def deleted=(x)
+        @_other_deleted ||= [ ]
+        @_other_deleted << x
+        super(x)
+      end
+
+      has_low_card_table :status, :class => ::UserStatus
+    end
+
+    user1 = ::UserTest.new
+
+    user1.deleted.should == [ nil, nil ]
+    user1.deleted = true
+    user1.deleted.should == [ [ true ], true ]
+    user1.deleted = false
+    user1.deleted.should == [ [ true, false ], false ]
+  end
+
+  it "should override methods defined in a superclass"
+
+  it "should allow defining an association twice, and the second one should win"
+
   it "should allow delegating no methods from the has_low_card_table class"
   it "should allow delegating just some methods from the has_low_card_table class"
 

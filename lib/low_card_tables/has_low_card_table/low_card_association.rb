@@ -1,6 +1,8 @@
 module LowCardTables
   module HasLowCardTable
     class LowCardAssociation
+      attr_reader :association_name
+
       def initialize(model_class, association_name, options)
         @model_class = model_class
         @association_name = association_name.to_s
@@ -14,6 +16,15 @@ module LowCardTables
         foreign_key_column_name
 
         low_card_class._low_card_referred_to_by(model_class)
+      end
+
+      def class_method_name_to_low_card_method_name_map
+        out = { }
+        low_card_class._low_card_value_column_names.map(&:to_s).each do |desired_method|
+          out[desired_method] = desired_method
+          out[desired_method + "="] = desired_method + "="
+        end
+        out
       end
 
       def create_low_card_object_for(model_instance)
@@ -34,6 +45,29 @@ module LowCardTables
         out
       end
 
+      def foreign_key_column_name
+        @foreign_key_column_name ||= begin
+          out = options[:foreign_key]
+
+          unless out
+            out = low_card_class.name.underscore
+            out = $1 if out =~ %r{/[^/]+$}i
+            out = out + "_id"
+          end
+
+          out = out.to_s if out.kind_of?(Symbol)
+
+          column = model_class.columns.detect { |c| c.name.strip.downcase == out.strip.downcase }
+          unless column
+            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name}, and we
+have a foreign-key column name of #{out.inspect}, but #{model_class} doesn't seem
+to have a column named that at all. Did you misspell it? Or perhaps something else is wrong?}
+          end
+
+          out
+        end
+      end
+
       def update_collapsed_rows(collapse_map, collapsing_update_scheme)
         if collapsing_update_scheme.respond_to?(:call)
           collapsing_update_scheme.call(collapse_map)
@@ -51,7 +85,7 @@ module LowCardTables
       def update_value_before_save!(model_instance)
         hash = { }
 
-        low_card_object = model_instance._low_card_objects_manager.object_for(association_name)
+        low_card_object = model_instance._low_card_objects_manager.object_for(self)
 
         low_card_class._low_card_value_column_names.each do |value_column_name|
           hash[value_column_name] = low_card_object[value_column_name]
@@ -108,60 +142,11 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
       end
 
       private
-      attr_reader :association_name, :options, :model_class
+      attr_reader :options, :model_class
 
       def sync_installed_methods!
-        # We create an anonymous module and include it, so that the class itself can properly override the
-        # method and call 'super' if it wants.
-        @methods_module ||= begin
-          out = Module.new
-          out.module_eval(%{
-  def #{association_name}
-    _low_card_objects_manager.object_for('#{association_name}')
-  end
-
-  def #{foreign_key_column_name}=(*args)
-    out = super(*args)
-    _low_card_objects_manager.invalidate_object_for('#{association_name}')
-    out
-  end})
-
-          model_class.send(:include, out)
-          out
-        end
-
-        @currently_installed_methods ||= [ ]
-
-        desired_methods = low_card_class._low_card_value_column_names.map(&:to_s)
-        model_instance_methods = model_class.instance_methods(true).map(&:to_s) - @currently_installed_methods
-        already_existing_methods = desired_methods.select do |method_name|
-          model_instance_methods.include?(method_name)
-        end
-
-        desired_methods -= already_existing_methods
-
-        methods_to_install = desired_methods - @currently_installed_methods
-        methods_to_remove = @currently_installed_methods - desired_methods
-
-        methods_to_remove.each do |method_to_remove|
-          @methods_module.module_eval("remove_method :#{method_to_remove}")
-          @methods_module.module_eval("remove_method :#{method_to_remove}=")
-
-          @currently_installed_methods -= [ method_to_remove ]
-        end
-
-        methods_to_install.each do |method_to_install|
-          @methods_module.module_eval(%{
-  def #{method_to_install}
-    #{association_name}.#{method_to_install}
-  end
-
-  def #{method_to_install}=(x)
-    #{association_name}.#{method_to_install} = x
-  end
-  })
-          @currently_installed_methods << method_to_install
-        end
+        model_class._low_card_dynamic_method_manager.ensure_has_association(self)
+        model_class._low_card_dynamic_method_manager.sync_methods!
       end
 
       def update_collapsed_rows_batch(starting_id, row_chunk_size, collapse_map)
@@ -187,29 +172,6 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
 
       def set_id_on_model(model_instance, new_id)
         model_instance[foreign_key_column_name] = new_id
-      end
-
-      def foreign_key_column_name
-        @foreign_key_column_name ||= begin
-          out = options[:foreign_key]
-
-          unless out
-            out = low_card_class.name.underscore
-            out = $1 if out =~ %r{/[^/]+$}i
-            out = out + "_id"
-          end
-
-          out = out.to_s if out.kind_of?(Symbol)
-
-          column = model_class.columns.detect { |c| c.name.strip.downcase == out.strip.downcase }
-          unless column
-            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name}, and we
-have a foreign-key column name of #{out.inspect}, but #{model_class} doesn't seem
-to have a column named that at all. Did you misspell it? Or perhaps something else is wrong?}
-          end
-
-          out
-        end
       end
 
       def ensure_correct_class!(model_instance)

@@ -1,6 +1,7 @@
 require 'active_support/concern'
 require 'low_card_tables/has_low_card_table/low_card_associations_manager'
 require 'low_card_tables/has_low_card_table/low_card_objects_manager'
+require 'low_card_tables/has_low_card_table/low_card_dynamic_method_manager'
 
 module LowCardTables
   module HasLowCardTable
@@ -24,6 +25,19 @@ module LowCardTables
 
         def low_card_value_collapsing_update_scheme(new_scheme = nil)
           _low_card_associations_manager.low_card_value_collapsing_update_scheme(new_scheme)
+        end
+
+        def _low_card_dynamic_method_manager
+          @_low_card_dynamic_method_manager ||= LowCardTables::HasLowCardTable::LowCardDynamicMethodManager.new(self)
+        end
+
+        def _low_card_dynamic_methods_module
+          @_low_card_dynamic_methods_module ||= begin
+            out = Module.new
+            const_set(:LowCardDynamicMethods, out)
+            include out
+            out
+          end
         end
       end
 
