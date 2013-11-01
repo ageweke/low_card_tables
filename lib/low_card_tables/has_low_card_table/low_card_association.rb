@@ -19,6 +19,8 @@ module LowCardTables
       end
 
       def class_method_name_to_low_card_method_name_map
+        return { } if options.has_key?(:delegate) && (! options[:delegate])
+
         out = { }
 
         low_card_class._low_card_value_column_names.map(&:to_s).each do |value_column_name|
