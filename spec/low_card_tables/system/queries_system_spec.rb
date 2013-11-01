@@ -42,11 +42,30 @@ describe "LowCardTables query support" do
     check_user_ids(::User.where(:status => { :deleted => false }), [ @user1, @user3, @user4, @user5 ])
   end
 
-  it "should allow 'where' clauses that use delegated properties directly"
+  it "should allow 'where' clauses that use the foreign-key name" do
+    check_user_ids(::User.where(:user_status_id => ::UserStatus.low_card_ids_matching({ :deleted => false })), [ @user1, @user3, @user4, @user5 ])
+  end
 
-  it "should not allow 'where' clauses that use non-delegated properties"
+  it "should allow 'where' clauses that use delegated properties directly" do
+    check_user_ids(::User.where(:deleted => false), [ @user1, @user3, @user4, @user5 ])
+  end
 
-  it "should compose 'where' clauses correctly"
+  it "should allow 'where' clauses that use delegated properties with differently-prefixed names directly" do
+    define_model_class(:User2, :lctables_spec_users) { has_low_card_table :status, :prefix => :foo, :class => ::UserStatus }
+
+    lambda { check_user_ids(::User2.where(:deleted => false), [ ]) }.should raise_error(::ActiveRecord::StatementInvalid)
+    check_user_ids(::User2.where(:foo_deleted => false), [ @user1, @user3, @user4, @user5 ])
+  end
+
+  it "should not allow 'where' clauses that use non-delegated properties" do
+    define_model_class(:User3, :lctables_spec_users) { has_low_card_table :status, :delegate => [ :deceased ], :class => ::UserStatus }
+
+    lambda { check_user_ids(::User3.where(:deleted => false), [ ]) }.should raise_error(::ActiveRecord::StatementInvalid)
+  end
+
+  it "should compose 'where' clauses correctly" do
+    check_user_ids(::User.where(:deleted => false).where(:gender => 'male'), [ @user4 ])
+  end
 
   it "should allow using low-card properties in the default scope"
   it "should allow using low-card properties in arbitrary scopes"

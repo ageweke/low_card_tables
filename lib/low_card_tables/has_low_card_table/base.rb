@@ -13,18 +13,7 @@ module LowCardTables
 
         def where(*args)
           if args.length == 1 && args[0].kind_of?(Hash)
-            resulting_constraints = { }
-
-            args[0].each do |query_key, query_constraints|
-              association = _low_card_associations_manager.maybe_low_card_association(query_key)
-              if association
-                resulting_constraints[association.foreign_key_column_name] = association.model_constraints_for_query(query_constraints)
-              else
-                resulting_constraints[query_key] = query_constraints
-              end
-            end
-
-            super(resulting_constraints)
+            super(_low_card_dynamic_method_manager.low_card_constraints_from_query(args[0]))
           else
             super(*args)
           end

@@ -26,6 +26,52 @@ module LowCardTables
         end
       end
 
+      def low_card_constraints_from_query(query_hash)
+        final_constraints = { }
+        low_card_association_to_constraint_map = { }
+
+        $stderr.puts "low_card_constraints_from_query: query_hash == #{query_hash.inspect}"
+
+        query_hash.each do |query_key, query_value|
+          low_card_delegation = @method_delegation_map[query_key.to_s]
+
+          if low_card_delegation
+            (association, method) = low_card_delegation
+
+            if method == :_low_card_object
+              if (! query_value.kind_of?(Hash))
+                raise ArgumentError, %{You are trying to constrain on #{@model_class.name}.#{query_key}, which is a low-card association,
+but the value you passed, #{query_value.inspect}, is not a Hash. Either pass a Hash,
+or constrain on #{association.foreign_key_column_name} explicitly, and find IDs
+yourself, using #{association.low_card_class.name}#ids_matching.}
+              end
+
+              low_card_association_to_constraint_map[association] ||= { }
+              low_card_association_to_constraint_map[association].merge!(query_value)
+            elsif method == :_low_card_foreign_key
+              final_constraints[query_key] = query_value
+            else
+              low_card_association_to_constraint_map[association] ||= { }
+              low_card_association_to_constraint_map[association][method] = query_value
+            end
+          else
+            final_constraints[query_key] = query_value
+          end
+        end
+
+        $stderr.puts "low_card_constraints_from_query: final_constraints == #{final_constraints.inspect}"
+        $stderr.puts "low_card_constraints_from_query: low_card_association_to_constraint_map == #{low_card_association_to_constraint_map.inspect}"
+
+        low_card_association_to_constraint_map.each do |association, constraints|
+          ids = association.low_card_class.low_card_ids_matching(constraints)
+          final_constraints[association.foreign_key_column_name] = ids
+        end
+
+        $stderr.puts "low_card_constraints_from_query: final_constraints == #{final_constraints.inspect}"
+
+        final_constraints
+      end
+
       def sync_methods!
         currently_delegated_methods = @method_delegation_map.keys
 
@@ -49,6 +95,10 @@ module LowCardTables
       private
       def associations
         @model_class._low_card_associations_manager.associations
+      end
+
+      def assocation(name)
+        @model_class._low_card_associations_manager.maybe_low_card_association(name)
       end
 
       def remove_delegated_methods!(method_names)
