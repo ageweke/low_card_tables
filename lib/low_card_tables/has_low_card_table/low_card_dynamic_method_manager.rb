@@ -48,7 +48,7 @@ module LowCardTables
 
       private
       def associations
-        @model_class._low_card_associations_manager.all_associations
+        @model_class._low_card_associations_manager.associations
       end
 
       def remove_delegated_methods!(method_names)

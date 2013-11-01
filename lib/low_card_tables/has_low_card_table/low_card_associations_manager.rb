@@ -4,6 +4,8 @@ require 'low_card_tables/errors'
 module LowCardTables
   module HasLowCardTable
     class LowCardAssociationsManager
+      attr_reader :associations
+
       def initialize(model_class)
         if (! superclasses(model_class).include?(::ActiveRecord::Base))
           raise ArgumentError, "You must supply an ActiveRecord model, not: #{model_class}"
@@ -12,14 +14,10 @@ module LowCardTables
         end
 
         @model_class = model_class
-        @associations = { }
+        @associations = [ ]
         @collapsing_update_scheme = :default
 
         install_methods!
-      end
-
-      def all_associations
-        @associations.values
       end
 
       def has_low_card_table(association_name, options = { })
@@ -28,24 +26,26 @@ module LowCardTables
         end
 
         association_name = association_name.to_s.strip.downcase
+        @associations.delete_if { |a| a.association_name.to_s.strip.downcase == association_name }
 
-        @associations[association_name] = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, association_name, options)
+        @associations << LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, association_name, options)
 
         @model_class._low_card_dynamic_method_manager.sync_methods!
       end
 
       def low_card_column_information_reset!(low_card_model)
-        @associations.values.each do |association|
+        @associations.each do |association|
           association.low_card_column_information_reset! if association.low_card_class == low_card_model
         end
       end
 
       def _low_card_association(name)
-        @associations[name.to_s] || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{name}' for #{@model_class.name}; there are associations named: #{@associations.keys.sort.join(", ")}.")
+        out = @associations.detect { |a| a.association_name.to_s.strip.downcase == name.to_s.strip.downcase }
+        out || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{name}' for #{@model_class.name}; there are associations named: #{@associations.map(&:association_name).sort.join(", ")}.")
       end
 
       def low_card_update_foreign_keys!(model_instance)
-        @associations.values.each do |association|
+        @associations.each do |association|
           association.update_value_before_save!(model_instance)
         end
       end
@@ -71,7 +71,7 @@ module LowCardTables
         update_scheme = @collapsing_update_scheme
         update_scheme = DEFAULT_COLLAPSING_UPDATE_VALUE if update_scheme == :default
 
-        @associations.values.each do |association|
+        @associations.each do |association|
           if association.low_card_class == low_card_model
             association.update_collapsed_rows(collapse_map, update_scheme)
           end

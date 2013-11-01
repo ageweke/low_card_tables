@@ -424,6 +424,38 @@ describe "LowCardTables association options" do
     user1.status.donation_level.should == 10
   end
 
-  it "should allow specifying the target class manually"
-  it "should allow specifying the foreign key manually"
+  %w{symbol string class}.each do |specification_type|
+    it "should allow specifying the target class manually as a #{specification_type}, and the foreign key manually" do
+      define_model_class(:Foobar, :lctables_spec_user_statuses) { is_low_card_table }
+
+      specification = case specification_type
+      when 'symbol' then :Foobar
+      when 'string' then 'Foobar'
+      when 'class' then Foobar
+      else raise "Unknown specification_type: #{specification_type.inspect}"
+      end
+
+      define_model_class(:Barbaz, :lctables_spec_users) { has_low_card_table :status, :class => specification, :foreign_key => :user_status_id }
+
+      user1 = ::Barbaz.new
+
+      user1.name = 'User1'
+
+      user1.deleted = false
+      user1.deceased = false
+      user1.gender = 'female'
+      user1.donation_level = 8
+
+      user1.save!
+
+      user1_again = ::Barbaz.find(user1.id)
+
+      user1_again.user_status_id.should == user1.user_status_id
+
+      user1_again.status.deleted.should == false
+      user1_again.status.deceased.should == false
+      user1_again.status.gender.should == 'female'
+      user1_again.status.donation_level.should == 8
+    end
+  end
 end
