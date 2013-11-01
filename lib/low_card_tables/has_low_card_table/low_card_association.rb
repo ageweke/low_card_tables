@@ -23,19 +23,37 @@ module LowCardTables
 
         out = { }
 
-        low_card_class._low_card_value_column_names.map(&:to_s).each do |value_column_name|
+        delegated_method_names.each do |column_name|
           desired_method_name = case options[:prefix]
-          when true then "#{association_name}_#{value_column_name}"
-          when String, Symbol then "#{options[:prefix]}_#{value_column_name}"
-          when nil then value_column_name
+          when true then "#{association_name}_#{column_name}"
+          when String, Symbol then "#{options[:prefix]}_#{column_name}"
+          when nil then column_name
           else raise ArgumentError, "Invalid :prefix option: #{options[:prefix].inspect}"
           end
 
-          out[desired_method_name] = value_column_name
-          out[desired_method_name + "="] = value_column_name + "="
+          out[desired_method_name] = column_name
+          out[desired_method_name + "="] = column_name + "="
         end
 
         out
+      end
+
+      def delegated_method_names
+        value_column_names = low_card_class._low_card_value_column_names.map(&:to_s)
+
+        if options.has_key?(:delegate) && (! options[:delegate])
+          [ ]
+        elsif options[:delegate].kind_of?(Array)
+          out = options[:delegate].map(&:to_s)
+          extra = out - value_column_names
+
+          if extra.length > 0
+            raise ArgumentError, "You told us to delegate the following methods to low-card class #{low_card_class}, but that model doesn't have these columns: #{extra.join(", ")}; it has these columns: #{low_card_class._low_card_value_column_names.join(", ")}"
+          end
+          out
+        else
+          low_card_class._low_card_value_column_names
+        end
       end
 
       def create_low_card_object_for(model_instance)

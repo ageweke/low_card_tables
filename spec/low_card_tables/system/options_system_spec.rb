@@ -259,32 +259,57 @@ describe "LowCardTables association options" do
   it "should allow delegating no methods from the has_low_card_table class" do
     define_model_class(:User, :lctables_spec_users) { has_low_card_table :status, :delegate => false }
 
-      user1 = ::User.new
-      user1.name = 'User1'
+    user1 = ::User.new
+    user1.name = 'User1'
 
-      lambda { user1.deleted }.should raise_error(NoMethodError)
-      lambda { user1.deceased }.should raise_error(NoMethodError)
-      lambda { user1.gender }.should raise_error(NoMethodError)
-      lambda { user1.donation_level }.should raise_error(NoMethodError)
-      lambda { user1.deleted = true }.should raise_error(NoMethodError)
-      lambda { user1.deceased = true }.should raise_error(NoMethodError)
-      lambda { user1.gender = 'male' }.should raise_error(NoMethodError)
-      lambda { user1.donation_level = 10 }.should raise_error(NoMethodError)
+    lambda { user1.deleted }.should raise_error(NoMethodError)
+    lambda { user1.deceased }.should raise_error(NoMethodError)
+    lambda { user1.gender }.should raise_error(NoMethodError)
+    lambda { user1.donation_level }.should raise_error(NoMethodError)
+    lambda { user1.deleted = true }.should raise_error(NoMethodError)
+    lambda { user1.deceased = true }.should raise_error(NoMethodError)
+    lambda { user1.gender = 'male' }.should raise_error(NoMethodError)
+    lambda { user1.donation_level = 10 }.should raise_error(NoMethodError)
 
-      user1.status.deleted = true
-      user1.status.deceased = false
-      user1.status.gender = 'female'
-      user1.status.donation_level = 10
+    user1.status.deleted = true
+    user1.status.deceased = false
+    user1.status.gender = 'female'
+    user1.status.donation_level = 10
 
-      user1.save!
+    user1.save!
 
-      user1.status.deleted.should == true
-      user1.status.deceased.should == false
-      user1.status.gender.should == 'female'
-      user1.status.donation_level.should == 10
+    user1.status.deleted.should == true
+    user1.status.deceased.should == false
+    user1.status.gender.should == 'female'
+    user1.status.donation_level.should == 10
   end
 
-  it "should allow delegating just specified methods from the has_low_card_table class"
+  it "should allow delegating just specified methods from the has_low_card_table class" do
+    define_model_class(:User, :lctables_spec_users) { has_low_card_table :status, :delegate => [ 'deleted', :gender ] }
+
+    user1 = ::User.new
+    user1.name = 'User1'
+
+    lambda { user1.deceased }.should raise_error(NoMethodError)
+    lambda { user1.donation_level }.should raise_error(NoMethodError)
+    lambda { user1.deceased = true }.should raise_error(NoMethodError)
+    lambda { user1.donation_level = 10 }.should raise_error(NoMethodError)
+
+    user1.deleted = true
+    user1.status.deceased = false
+    user1.gender = 'female'
+    user1.status.donation_level = 10
+
+    user1.save!
+
+    user1.deleted.should == true
+    user1.status.deleted.should == true
+    user1.status.deceased.should == false
+    user1.gender.should == 'female'
+    user1.status.gender.should == 'female'
+    user1.status.donation_level.should == 10
+  end
+
   it "should allow delegating all methods from the has_low_card_table class except what's excluded"
 
   it "should allow specifying the target class manually"
