@@ -328,6 +328,8 @@ describe "LowCardTables migration support" do
     [ ::User.find(user1.id), ::User.find(user4.id), ::User.find(user5.id) ].map(&:user_status_id).uniq.length.should == 3 # all different
   end
 
+  it "should not attempt to update any associated tables if a column is removed and told not to"
+
   it "should update all associated tables, including multiple references to the same low-card table, in chunks as specified, when a column is removed" do
     tn = @table_name
     migrate do

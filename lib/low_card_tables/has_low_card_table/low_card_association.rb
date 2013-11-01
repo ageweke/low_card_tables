@@ -20,10 +20,19 @@ module LowCardTables
 
       def class_method_name_to_low_card_method_name_map
         out = { }
-        low_card_class._low_card_value_column_names.map(&:to_s).each do |desired_method|
-          out[desired_method] = desired_method
-          out[desired_method + "="] = desired_method + "="
+
+        low_card_class._low_card_value_column_names.map(&:to_s).each do |value_column_name|
+          desired_method_name = case options[:prefix]
+          when true then "#{association_name}_#{value_column_name}"
+          when String, Symbol then "#{options[:prefix]}_#{value_column_name}"
+          when nil then value_column_name
+          else raise ArgumentError, "Invalid :prefix option: #{options[:prefix].inspect}"
+          end
+
+          out[desired_method_name] = value_column_name
+          out[desired_method_name + "="] = value_column_name + "="
         end
+
         out
       end
 
