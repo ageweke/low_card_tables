@@ -26,7 +26,7 @@ module LowCardTables
         end
       end
 
-      def low_card_constraints_from_query(query_hash)
+      def scope_from_query(base_scope, query_hash)
         final_constraints = { }
         low_card_association_to_constraint_map = { }
 
@@ -57,12 +57,35 @@ yourself, using #{association.low_card_class.name}#ids_matching.}
           end
         end
 
+        out = base_scope
+        out = base_scope.where(final_constraints.merge(:_low_card_direct => true)) if final_constraints.size > 0
+
+        # This is gross. In ActiveRecord v3, doing something like this:
+        #
+        #    Model.where(:x => [ 1, 2, 3 ]).where(:x => [ 3, 4, 5 ])
+        #
+        # ...results in "... WHERE x IN (3, 4, 5)" -- i.e., it's last-clause wins, and the first one is totally
+        # ignored. While this sucks in general (in my opinion), it's genuinely a problem for our system; we need to
+        # be able to say Model.where(:deleted => false).where(:deceased => false) and only get back non-deleted, alive
+        # users -- and, underneath, both those queries transform to conditions on :user_status_id.
+        #
+        # Our workaround is to instead use text-based queries for these conditions, because:
+        #
+        #    Model.where("x IN :ids", :ids => [ 1, 2, 3 ]).where("x IN :ids", :ids => [ 3, 4, 5 ])
+        #
+        # ...results in "... WHERE x IN (1, 2, 3) AND x IN (3, 4, 5)", which gives us the right value. (ActiveRecord
+        # doesn't ever parse SQL you hand to it, so it has no way of knowing these are conditions on the same column --
+        # so it keeps both clauses.)
+        #
+        # ActiveRecord 4 does the right thing here (IMHO) and behaves identically whether you pass in a Hash or a text
+        # clause. However, our hack works fine with both versions, so we'll keep it for now.
         low_card_association_to_constraint_map.each do |association, constraints|
           ids = association.low_card_class.low_card_ids_matching(constraints)
-          final_constraints[association.foreign_key_column_name] = ids
+          out = out.where("#{association.foreign_key_column_name} IN (:ids)", :ids => ids)
         end
 
-        final_constraints
+
+        out
       end
 
       def sync_methods!

@@ -67,8 +67,30 @@ describe "LowCardTables query support" do
     check_user_ids(::User.where(:deleted => false).where(:gender => 'male'), [ @user4 ])
   end
 
-  it "should allow using low-card properties in the default scope"
-  it "should allow using low-card properties in arbitrary scopes"
+  it "should compose delegated and specified clauses correctly" do
+    check_user_ids(::User.where(:deleted => false, :status => { :gender => 'male'}), [ @user4 ])
+  end
+
+  it "should allow using low-card properties in the default scope" do
+    class ::User < ::ActiveRecord::Base
+      default_scope where(:deleted => false)
+    end
+
+    check_user_ids(::User.all, [ @user1, @user3, @user4, @user5 ])
+  end
+
+  it "should allow using low-card properties in arbitrary scopes" do
+    class ::User < ::ActiveRecord::Base
+      default_scope { where(:deleted => false) }
+      scope :foo, where(:gender => 'female')
+      scope :bar, where(:status => { :deceased => false })
+    end
+
+    check_user_ids(::User.foo, [ @user1, @user3, @user5 ])
+    check_user_ids(::User.bar, [ @user1, @user4, @user5 ])
+    check_user_ids(::User.foo.bar, [ @user1, @user5 ])
+    check_user_ids(::User.bar.foo, [ @user1, @user5 ])
+  end
 
   it "should pick up new low-card rows when using a low-card property in an arbitrary scope"
 end
