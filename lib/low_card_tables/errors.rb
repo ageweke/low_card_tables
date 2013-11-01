@@ -24,5 +24,7 @@ module LowCardTables
     class LowCardCannotSaveAssociatedLowCardObjectsError < LowCardError; end
 
     class LowCardInvalidLowCardRowsError < LowCardError; end
+
+    class LowCardStaticScopeError < LowCardError; end
   end
 end

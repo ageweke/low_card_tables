@@ -82,8 +82,8 @@ describe "LowCardTables query support" do
   it "should allow using low-card properties in arbitrary scopes" do
     class ::User < ::ActiveRecord::Base
       default_scope { where(:deleted => false) }
-      scope :foo, where(:gender => 'female')
-      scope :bar, where(:status => { :deceased => false })
+      scope :foo, lambda { where(:gender => 'female') }
+      scope :bar, lambda { where(:status => { :deceased => false }) }
     end
 
     check_user_ids(::User.foo, [ @user1, @user3, @user5 ])
@@ -95,7 +95,7 @@ describe "LowCardTables query support" do
   it "should pick up new low-card rows when using a low-card property in a scope" do
     class ::User < ::ActiveRecord::Base
       default_scope { where(:deleted => false) }
-      scope :foo, where(:deceased => false)
+      scope :foo, lambda { where(:deceased => false) }
       scope :bar, lambda { where(:gender => 'female') }
     end
 
@@ -109,5 +109,28 @@ describe "LowCardTables query support" do
     check_user_ids(::User.all, [ @user1, @user3, @user4, @user5, @user6 ])
     check_user_ids(::User.foo, [ @user1, @user4, @user5, @user6 ])
     check_user_ids(::User.bar, [ @user1, @user3, @user5, @user6 ])
+  end
+
+  it "should blow up if you constrain on low-card foreign keys in a static scope" do
+    lambda do
+      class ::User < ::ActiveRecord::Base
+        scope :foo, where(:deleted => false)
+      end
+    end.should raise_error(LowCardTables::Errors::LowCardStaticScopeError, /user_status_id/mi)
+
+    lambda do
+      class ::User < ::ActiveRecord::Base
+        scope :foo, where(:user_status_id => ::UserStatus.low_card_ids_matching(:deleted => false))
+      end
+    end.should raise_error(LowCardTables::Errors::LowCardStaticScopeError, /user_status_id/mi)
+  end
+
+
+  it "should not blow up if you constrain on other things in a static scope" do
+    class ::User < ::ActiveRecord::Base
+      scope :foo, where(:name => %w{foo bar})
+    end
+
+    ::User.first.should be
   end
 end
