@@ -92,5 +92,19 @@ describe "LowCardTables query support" do
     check_user_ids(::User.bar.foo, [ @user1, @user5 ])
   end
 
-  it "should pick up new low-card rows when using a low-card property in an arbitrary scope"
+  it "should pick up new low-card rows when using a low-card property in a scope" do
+    class ::User < ::ActiveRecord::Base
+      default_scope { where(:deleted => false) }
+      scope :foo, where(:deceased => false)
+    end
+
+    check_user_ids(::User.all, [ @user1, @user3, @user4, @user5 ])
+    check_user_ids(::User.foo, [ @user1, @user4, @user5 ])
+
+    @user6 = create_user!('User6', false, false, 'other', 7)
+    [ @user1, @user2, @user3, @user4, @user5 ].map(&:user_status_id).include?(@user6.user_status_id).should_not be
+
+    check_user_ids(::User.all, [ @user1, @user3, @user4, @user5, @user6 ])
+    check_user_ids(::User.foo, [ @user1, @user4, @user5, @user6 ])
+  end
 end
