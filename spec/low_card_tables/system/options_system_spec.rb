@@ -310,7 +310,31 @@ describe "LowCardTables association options" do
     user1.status.donation_level.should == 10
   end
 
-  it "should allow delegating all methods from the has_low_card_table class except what's excluded"
+  it "should allow delegating all methods from the has_low_card_table class except what's excluded" do
+    define_model_class(:User, :lctables_spec_users) { has_low_card_table :status, :delegate => { :except => [ 'deceased', :donation_level ] } }
+
+    user1 = ::User.new
+    user1.name = 'User1'
+
+    lambda { user1.deceased }.should raise_error(NoMethodError)
+    lambda { user1.donation_level }.should raise_error(NoMethodError)
+    lambda { user1.deceased = true }.should raise_error(NoMethodError)
+    lambda { user1.donation_level = 10 }.should raise_error(NoMethodError)
+
+    user1.deleted = true
+    user1.status.deceased = false
+    user1.gender = 'female'
+    user1.status.donation_level = 10
+
+    user1.save!
+
+    user1.deleted.should == true
+    user1.status.deleted.should == true
+    user1.status.deceased.should == false
+    user1.gender.should == 'female'
+    user1.status.gender.should == 'female'
+    user1.status.donation_level.should == 10
+  end
 
   it "should allow specifying the target class manually"
   it "should allow specifying the foreign key manually"

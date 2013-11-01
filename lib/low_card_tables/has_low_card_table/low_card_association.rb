@@ -6,7 +6,7 @@ module LowCardTables
       def initialize(model_class, association_name, options)
         @model_class = model_class
         @association_name = association_name.to_s
-        @options = options
+        @options = options.with_indifferent_access
 
         sync_installed_methods!
 
@@ -51,6 +51,15 @@ module LowCardTables
             raise ArgumentError, "You told us to delegate the following methods to low-card class #{low_card_class}, but that model doesn't have these columns: #{extra.join(", ")}; it has these columns: #{low_card_class._low_card_value_column_names.join(", ")}"
           end
           out
+        elsif options[:delegate] && options[:delegate].kind_of?(Hash) && options[:delegate].keys.map(&:to_s) == %w{except}
+          excluded = (options[:delegate][:except] || options[:delegate]['except']).map(&:to_s)
+          extra = excluded - value_column_names
+
+          if extra.length > 0
+            raise ArgumentError, "You told us to delegate all but the following methods to low-card class #{low_card_class}, but that model doesn't have these columns: #{extra.join(", ")}; it has these columns: #{low_card_class._low_card_value_column_names.join(", ")}"
+          end
+
+          value_column_names - excluded
         else
           low_card_class._low_card_value_column_names
         end
