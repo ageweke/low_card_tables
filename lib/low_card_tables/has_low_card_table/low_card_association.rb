@@ -8,8 +8,6 @@ module LowCardTables
         @association_name = association_name.to_s
         @options = options.with_indifferent_access
 
-        sync_installed_methods!
-
         # call a few methods that will raise errors if things are configured incorrectly;
         # we call them here so that you get those errors immediately, at startup, instead of
         # at some undetermined later point
@@ -183,7 +181,6 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
       attr_reader :options, :model_class
 
       def sync_installed_methods!
-        model_class._low_card_dynamic_method_manager.ensure_has_association(self)
         model_class._low_card_dynamic_method_manager.sync_methods!
       end
 

@@ -3,20 +3,7 @@ module LowCardTables
     class LowCardDynamicMethodManager
       def initialize(model_class)
         @model_class = model_class
-        @associations = [ ]
-
         @method_delegation_map = { }
-      end
-
-      def ensure_has_association(association)
-        existing = @associations.detect { |a| a.association_name == association.association_name }
-
-        return if existing && existing == association
-
-        @associations -= [ existing ] if existing
-        @associations << association
-
-        sync_methods!
       end
 
       def run_low_card_method(object, method_name, args)
@@ -44,7 +31,7 @@ module LowCardTables
 
         @method_delegation_map = { }
 
-        @associations.each do |association|
+        associations.each do |association|
           @method_delegation_map[association.association_name.to_s] = [ association, :_low_card_object ]
           @method_delegation_map[association.foreign_key_column_name.to_s] = [ association, :_low_card_foreign_key ]
           @method_delegation_map[association.foreign_key_column_name.to_s + "="] = [ association, :_low_card_foreign_key= ]
@@ -60,6 +47,10 @@ module LowCardTables
       end
 
       private
+      def associations
+        @model_class._low_card_associations_manager.all_associations
+      end
+
       def remove_delegated_methods!(method_names)
         mod = @model_class._low_card_dynamic_methods_module
 

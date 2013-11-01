@@ -254,7 +254,41 @@ describe "LowCardTables association options" do
     end
   end
 
-  it "should allow defining an association twice, and the second one should win"
+  it "should allow defining an association twice, and the second one should win" do
+    define_model_class(:User, :lctables_spec_users) do
+      has_low_card_table :status
+      has_low_card_table :status, :prefix => :foo
+    end
+
+    user1 = ::User.new
+    user1.name = 'User1'
+
+    lambda { user1.deleted }.should raise_error(NoMethodError)
+    lambda { user1.deceased }.should raise_error(NoMethodError)
+    lambda { user1.gender }.should raise_error(NoMethodError)
+    lambda { user1.donation_level }.should raise_error(NoMethodError)
+    lambda { user1.deleted = true }.should raise_error(NoMethodError)
+    lambda { user1.deceased = true }.should raise_error(NoMethodError)
+    lambda { user1.gender = 'male' }.should raise_error(NoMethodError)
+    lambda { user1.donation_level = 10 }.should raise_error(NoMethodError)
+
+    user1.foo_deleted = true
+    user1.foo_deceased = false
+    user1.foo_gender = 'female'
+    user1.foo_donation_level = 10
+
+    user1.save!
+
+    user1.foo_deleted.should == true
+    user1.foo_deceased.should == false
+    user1.foo_gender.should == 'female'
+    user1.foo_donation_level.should == 10
+
+    user1.status.deleted.should == true
+    user1.status.deceased.should == false
+    user1.status.gender.should == 'female'
+    user1.status.donation_level.should == 10
+  end
 
   it "should allow delegating no methods from the has_low_card_table class" do
     define_model_class(:User, :lctables_spec_users) { has_low_card_table :status, :delegate => false }
@@ -332,6 +366,60 @@ describe "LowCardTables association options" do
     user1.status.deleted.should == true
     user1.status.deceased.should == false
     user1.gender.should == 'female'
+    user1.status.gender.should == 'female'
+    user1.status.donation_level.should == 10
+  end
+
+  it "should blow up if asked to delegate or exclude methods that aren't there" do
+    e = nil
+    begin
+      define_model_class(:User, :lctables_spec_users) { has_low_card_table :status, :delegate => [ :foo ] }
+    rescue ArgumentError => x
+      e = x
+    end
+
+    e.message.should match(/foo/mi)
+    e.message.should match(/deleted/mi)
+    e.message.should match(/deceased/mi)
+    e.message.should match(/gender/mi)
+    e.message.should match(/donation_level/mi)
+
+    e = nil
+    begin
+      define_model_class(:User, :lctables_spec_users) { has_low_card_table :status, :delegate => { :except => [ :foo ] } }
+    rescue ArgumentError => x
+      e = x
+    end
+
+    e.message.should match(/foo/mi)
+    e.message.should match(/deleted/mi)
+    e.message.should match(/deceased/mi)
+    e.message.should match(/gender/mi)
+    e.message.should match(/donation_level/mi)
+  end
+
+  it "should combine :prefix and :delegate correctly" do
+    define_model_class(:User, :lctables_spec_users) { has_low_card_table :status, :prefix => :foo, :delegate => { :except => [ 'deceased', :donation_level ] } }
+
+    user1 = ::User.new
+    user1.name = 'User1'
+
+    lambda { user1.foo_deceased }.should raise_error(NoMethodError)
+    lambda { user1.foo_donation_level }.should raise_error(NoMethodError)
+    lambda { user1.foo_deceased = true }.should raise_error(NoMethodError)
+    lambda { user1.foo_donation_level = 10 }.should raise_error(NoMethodError)
+
+    user1.foo_deleted = true
+    user1.status.deceased = false
+    user1.foo_gender = 'female'
+    user1.status.donation_level = 10
+
+    user1.save!
+
+    user1.foo_deleted.should == true
+    user1.status.deleted.should == true
+    user1.status.deceased.should == false
+    user1.foo_gender.should == 'female'
     user1.status.gender.should == 'female'
     user1.status.donation_level.should == 10
   end
