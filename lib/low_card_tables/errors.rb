@@ -26,5 +26,7 @@ module LowCardTables
     class LowCardInvalidLowCardRowsError < LowCardError; end
 
     class LowCardStaticScopeError < LowCardError; end
+
+    class LowCardUnsupportedDatabaseError < LowCardError; end
   end
 end

@@ -34,17 +34,61 @@ module LowCardTables
 
       private
       def config
-        @config ||= begin
-          invalid_config_file! unless File.exist?(config_file_path)
-          require config_file_path
+        config_from_config_file || travis_ci_config_from_environment || invalid_config_file!
+      end
 
-          invalid_config_file! unless defined?(LOW_CARD_TABLES_SPEC_DATABASE_CONFIG)
-          invalid_config_file! unless LOW_CARD_TABLES_SPEC_DATABASE_CONFIG.kind_of?(Hash)
+      def config_from_config_file
+        return nil unless File.exist?(config_file_path)
+        require config_file_path
 
-          LOW_CARD_TABLES_SPEC_DATABASE_CONFIG[:require] || invalid_config_file!
-          LOW_CARD_TABLES_SPEC_DATABASE_CONFIG[:database_gem_name] || invalid_config_file!
+        return nil unless defined?(LOW_CARD_TABLES_SPEC_DATABASE_CONFIG)
+        return nil unless LOW_CARD_TABLES_SPEC_DATABASE_CONFIG.kind_of?(Hash)
 
-          LOW_CARD_TABLES_SPEC_DATABASE_CONFIG || invalid_config_file!
+        return nil unless LOW_CARD_TABLES_SPEC_DATABASE_CONFIG[:require]
+        return nil unless LOW_CARD_TABLES_SPEC_DATABASE_CONFIG[:database_gem_name]
+
+        return nil unless LOW_CARD_TABLES_SPEC_DATABASE_CONFIG
+        LOW_CARD_TABLES_SPEC_DATABASE_CONFIG
+      end
+
+      def travis_ci_config_from_environment
+        dbtype = (ENV['LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE'] || '').strip.downcase
+        case dbtype
+        when 'postgres', 'postgresql'
+          {
+            :require => 'pg',
+            :database_gem_name => 'pg',
+            :config => {
+              :adapter => 'postgresql',
+              :database => 'myapp_test',
+              :username => 'postgres',
+              :min_messages => 'WARNING'
+            }
+          }
+        when 'mysql'
+          {
+            :require => 'mysql2',
+            :database_gem_name => 'mysql2',
+            :config => {
+              :adapter => 'mysql2',
+              :database => 'myapp_test',
+              :username => 'travis',
+              :encoding => 'utf8'
+            }
+          }
+        when 'sqlite'
+          {
+            :require => 'sqlite3',
+            :database_gem_name => 'sqlite3',
+            :config => {
+              :adapter => 'sqlite3',
+              :database => ':memory:',
+              :timeout => 500
+            }
+          }
+        when '', nil then nil
+        else
+          raise "Unknown Travis CI database type: #{dbtype.inspect}"
         end
       end
 
@@ -61,7 +105,11 @@ module LowCardTables
 
   :require => 'name_of_adapter_to_require',
   :database_gem_name => 'name_of_gem_for_adapter',
-  :config  => { ...whatever ActiveRecord::Base.establish_connection should be passed... }}
+  :config  => { ...whatever ActiveRecord::Base.establish_connection should be passed... }
+
+Alternatively, if you're running under Travis CI, you can set the environment variable
+LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE to 'postgres', 'mysql', or 'sqlite', and it will
+use the correct configuration for testing on Travis CI.}
       end
     end
   end

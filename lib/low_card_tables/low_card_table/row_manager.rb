@@ -405,8 +405,9 @@ couldn't find:
         case @low_card_model.connection.class.name
         when /postgresql/i then with_database_exclusive_table_lock_postgresql(&block)
         when /mysql/i then with_database_exclusive_table_lock_mysql(&block)
+        when /sqlite/i then with_database_exclusive_table_lock_sqlite(&block)
         else
-          raise LowCardTables::Errors::UnsupportedDatabaseError, %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
+          raise LowCardTables::Errors::LowCardUnsupportedDatabaseError, %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
 but, when we went to create them, we discovered that we don't know how to exclusively
 lock tables in your database. (This is very important so that we don't accidentally
 create duplicate rows.)
@@ -423,6 +424,11 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         # ...which, for whatever reason, PostgreSQL doesn't like. Escaping it this way works fine.
         escaped = @low_card_model.connection.quote_table_name(@low_card_model.table_name)
         run_sql("LOCK TABLE #{escaped}", { })
+        block.call
+      end
+
+      def with_database_exclusive_table_lock_sqlite(&block)
+        # There is no locking possible.
         block.call
       end
 
