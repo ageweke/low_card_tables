@@ -3,6 +3,7 @@ require 'active_support'
 require "low_card_tables/version"
 require 'low_card_tables/active_record/base'
 require 'low_card_tables/active_record/migrations'
+require 'low_card_tables/active_record/relation'
 require 'low_card_tables/low_card_table/cache_expiration/has_cache_expiration'
 
 module LowCardTables
@@ -32,4 +33,8 @@ class ActiveRecord::Migration
       end
     end
   end
+end
+
+class ActiveRecord::Relation
+  include LowCardTables::ActiveRecord::Relation
 end

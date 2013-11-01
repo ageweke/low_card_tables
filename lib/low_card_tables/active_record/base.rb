@@ -29,6 +29,10 @@ module LowCardTables
           has_low_card_table(*args)
         end
 
+        def has_any_low_card_tables?
+          @_low_card_has_low_card_table_included
+        end
+
         def _low_card_disable_save_when_needed!
           send(:define_method, :save_low_card_row!) do |*args|
             begin

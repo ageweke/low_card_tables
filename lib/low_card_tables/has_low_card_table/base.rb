@@ -11,14 +11,6 @@ module LowCardTables
       module ClassMethods
         delegate :has_low_card_table, :to => :_low_card_associations_manager
 
-        def where(*args)
-          if args.length == 1 && args[0].kind_of?(Hash)
-            super(_low_card_dynamic_method_manager.low_card_constraints_from_query(args[0]))
-          else
-            super(*args)
-          end
-        end
-
         def _low_card_associations_manager
           @_low_card_associations_manager ||= LowCardTables::HasLowCardTable::LowCardAssociationsManager.new(self)
         end

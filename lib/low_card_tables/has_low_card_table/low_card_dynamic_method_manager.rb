@@ -30,8 +30,6 @@ module LowCardTables
         final_constraints = { }
         low_card_association_to_constraint_map = { }
 
-        $stderr.puts "low_card_constraints_from_query: query_hash == #{query_hash.inspect}"
-
         query_hash.each do |query_key, query_value|
           low_card_delegation = @method_delegation_map[query_key.to_s]
 
@@ -59,15 +57,10 @@ yourself, using #{association.low_card_class.name}#ids_matching.}
           end
         end
 
-        $stderr.puts "low_card_constraints_from_query: final_constraints == #{final_constraints.inspect}"
-        $stderr.puts "low_card_constraints_from_query: low_card_association_to_constraint_map == #{low_card_association_to_constraint_map.inspect}"
-
         low_card_association_to_constraint_map.each do |association, constraints|
           ids = association.low_card_class.low_card_ids_matching(constraints)
           final_constraints[association.foreign_key_column_name] = ids
         end
-
-        $stderr.puts "low_card_constraints_from_query: final_constraints == #{final_constraints.inspect}"
 
         final_constraints
       end
