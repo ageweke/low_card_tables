@@ -96,15 +96,18 @@ describe "LowCardTables query support" do
     class ::User < ::ActiveRecord::Base
       default_scope { where(:deleted => false) }
       scope :foo, where(:deceased => false)
+      scope :bar, lambda { where(:gender => 'female') }
     end
 
     check_user_ids(::User.all, [ @user1, @user3, @user4, @user5 ])
     check_user_ids(::User.foo, [ @user1, @user4, @user5 ])
+    check_user_ids(::User.bar, [ @user1, @user3, @user5 ])
 
-    @user6 = create_user!('User6', false, false, 'other', 7)
+    @user6 = create_user!('User6', false, false, 'female', 7)
     [ @user1, @user2, @user3, @user4, @user5 ].map(&:user_status_id).include?(@user6.user_status_id).should_not be
 
     check_user_ids(::User.all, [ @user1, @user3, @user4, @user5, @user6 ])
     check_user_ids(::User.foo, [ @user1, @user4, @user5, @user6 ])
+    check_user_ids(::User.bar, [ @user1, @user3, @user5, @user6 ])
   end
 end
