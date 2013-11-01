@@ -49,12 +49,16 @@ module LowCardTables
       class << self
         def verify_unique_index_as_needed(table_name, options = { }, &block)
           options = (options || { }).dup
-          low_card_option = options.delete(:low_card)
-          low_card_referrers = options.delete(:low_card_referrers)
+
+          low_card_options = { }
+          options.keys.each do |k|
+            low_card_options[k] = options.delete(k) if k.to_s =~ /^low_card/
+          end
+
           low_card_model = existing_low_card_model_for(table_name)
 
           model_class_to_use = low_card_model || temporary_model_class_for(table_name)
-          is_low_card = (low_card_option || low_card_model)
+          is_low_card = (low_card_options[:low_card] || low_card_model)
 
           model_class_to_use.reset_column_information
           previous_columns = model_class_to_use._low_card_value_column_names
@@ -69,10 +73,12 @@ module LowCardTables
               new_columns = model_class_to_use._low_card_value_column_names
 
               if (previous_columns - new_columns).length > 0
-                model_class_to_use.low_card_collapse_rows_and_update_referrers!(low_card_referrers)
+                model_class_to_use.low_card_collapse_rows_and_update_referrers!(low_card_options)
               end
 
-              model_class_to_use._low_card_ensure_has_unique_index!(true)
+              unless low_card_options.has_key?(:low_card_collapse_rows) && (! low_card_options[:low_card_collapse_rows])
+                model_class_to_use._low_card_ensure_has_unique_index!(true)
+              end
             end
           end
 

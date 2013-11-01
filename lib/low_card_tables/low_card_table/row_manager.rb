@@ -73,7 +73,11 @@ module LowCardTables
         value_columns.map(&:name)
       end
 
-      def collapse_rows_and_update_referrers!(additional_referring_models = nil)
+      def collapse_rows_and_update_referrers!(low_card_options = { })
+        return if low_card_options.has_key?(:low_card_collapse_rows) && (! low_card_options[:low_card_collapse_rows])
+
+        additional_referring_models = low_card_options[:low_card_referrers]
+
         attributes_to_rows_map = { }
         @low_card_model.all.sort_by(&:id).each do |row|
           attributes = value_attributes(row)
@@ -98,9 +102,11 @@ module LowCardTables
         all_referring_models = referring_models | (additional_referring_models || [ ])
         transaction_models = all_referring_models + [ @low_card_model ]
 
-        transactions_on(transaction_models) do
-          all_referring_models.each do |referring_model|
-            referring_model._low_card_update_collapsed_rows(@low_card_model, collapse_map)
+        unless low_card_options.has_key?(:low_card_update_referring_models) && (! low_card_options[:low_card_update_referring_models])
+          transactions_on(transaction_models) do
+            all_referring_models.each do |referring_model|
+              referring_model._low_card_update_collapsed_rows(@low_card_model, collapse_map)
+            end
           end
         end
 
