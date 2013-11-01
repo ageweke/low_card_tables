@@ -40,8 +40,11 @@ module LowCardTables
       end
 
       def _low_card_association(name)
-        out = @associations.detect { |a| a.association_name.to_s.strip.downcase == name.to_s.strip.downcase }
-        out || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{name}' for #{@model_class.name}; there are associations named: #{@associations.map(&:association_name).sort.join(", ")}.")
+        maybe_low_card_association(name) || (raise LowCardTables::Errors::LowCardAssociationNotFoundError, "There is no low-card association named '#{name}' for #{@model_class.name}; there are associations named: #{@associations.map(&:association_name).sort.join(", ")}.")
+      end
+
+      def maybe_low_card_association(name)
+        @associations.detect { |a| a.association_name.to_s.strip.downcase == name.to_s.strip.downcase }
       end
 
       def low_card_update_foreign_keys!(model_instance)

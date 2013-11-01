@@ -36,6 +36,10 @@ module LowCardTables
         out
       end
 
+      def model_constraints_for_query(query_constraints)
+        low_card_class.low_card_ids_matching(query_constraints)
+      end
+
       def delegated_method_names
         value_column_names = low_card_class._low_card_value_column_names.map(&:to_s)
 

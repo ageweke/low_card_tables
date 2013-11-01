@@ -11,6 +11,25 @@ module LowCardTables
       module ClassMethods
         delegate :has_low_card_table, :to => :_low_card_associations_manager
 
+        def where(*args)
+          if args.length == 1 && args[0].kind_of?(Hash)
+            resulting_constraints = { }
+
+            args[0].each do |query_key, query_constraints|
+              association = _low_card_associations_manager.maybe_low_card_association(query_key)
+              if association
+                resulting_constraints[association.foreign_key_column_name] = association.model_constraints_for_query(query_constraints)
+              else
+                resulting_constraints[query_key] = query_constraints
+              end
+            end
+
+            super(resulting_constraints)
+          else
+            super(*args)
+          end
+        end
+
         def _low_card_associations_manager
           @_low_card_associations_manager ||= LowCardTables::HasLowCardTable::LowCardAssociationsManager.new(self)
         end

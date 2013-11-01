@@ -59,7 +59,8 @@ module LowCardTables
       end
 
       def rows_matching(hash_or_hashes = nil, &block)
-        hashes = Array(hash_or_hashes || [ ])
+        hashes = hash_or_hashes || [ ]
+        hashes = [ hashes ] unless hashes.kind_of?(Array)
         hashes.each { |h| raise ArgumentError, "You must supply Hashes, not: #{h.inspect}" unless h.kind_of?(Hash) }
 
         if block && hashes.length > 0
