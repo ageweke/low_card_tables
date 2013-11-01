@@ -210,6 +210,7 @@ We're looking for an index on the following columns:
       end
 
       def current_unique_indexes
+        return [ ] if (! @low_card_model.table_exists?)
         @low_card_model.connection.indexes(@low_card_model.table_name).select { |i| i.unique }
       end
 
@@ -434,12 +435,13 @@ equivalent of 'LOCK TABLE'(s) in your database.}
 
       def with_database_exclusive_table_lock_mysql(&block)
         begin
-          run_sql("LOCK TABLES :table", :table => @low_card_model.table_name)
+          escaped = @low_card_model.connection.quote_table_name(@low_card_model.table_name)
+          run_sql("LOCK TABLES #{escaped} WRITE", { })
           block.call
         ensure
           begin
-            run_sql("UNLOCK TABLES :table", :table => @low_card_model.table_name)
-          rescue ActiveRecord::StatementInvalid => si
+            run_sql("UNLOCK TABLES", { })
+          rescue ::ActiveRecord::StatementInvalid => si
             # we tried our best!
           end
         end

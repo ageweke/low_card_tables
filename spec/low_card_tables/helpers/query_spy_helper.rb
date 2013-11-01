@@ -28,7 +28,7 @@ module LowCardTables
       def call(notification_name, when1, when2, id, data)
         sql = data[:sql]
         if sql && sql.strip.length > 0
-          if sql =~ /^\s*SELECT.*FROM\s+['"]*\s*#{@table_name}\s*['"]*\s+/mi
+          if sql =~ /^\s*SELECT.*FROM\s+['"\`]*\s*#{@table_name}\s*['"\`]*\s+/mi
             @calls << data.merge(:backtrace => caller)
           end
         end
