@@ -1,6 +1,6 @@
 # low_card_tables
 
-Greatly improve scalability and maintainability of your database tables by breaking out columns containing few distinct values (e.g., booleans and other flags) into a separate table that's transparently referenced and used. Supports Rails 3.0.x, 3.1.x, 3.2.x, and 4.0.x, running on Ruby 1.8.7, 1.9.3, 2.0.0, and JRuby 1.7.4, with MySQL, PostgreSQL, and Sqlite. (And adding support for other databases is trivial!)
+Greatly improve scalability and maintainability of your database tables by breaking out columns containing few distinct values (e.g., booleans and other flags) into a separate table that's transparently referenced and used. Supports Rails 3.0.x, 3.1.x, 3.2.x, and 4.0.x, running on Ruby 1.8.7, 1.9.3, and 2.0.0 with MySQL, PostgreSQL, and Sqlite. (JRuby is supported, but only with MySQL, because `low_card_tables` depends on the `activerecord-import` gem, and it currently does not have JRuby support for anything but MySQL.) Adding support for other databases is trivial!
 
 `low_card_tables` is short for "low-cardinality tables". Cardinality, when applied to a database column, is the measure of the number of distinct values that column can hold. This Gem is meant to be used for columns that hold few distinct values throughout the table &mdash; hence, they have low cardinality.
 

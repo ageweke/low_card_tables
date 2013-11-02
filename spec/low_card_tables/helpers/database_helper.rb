@@ -65,42 +65,63 @@ module LowCardTables
 
       def travis_ci_config_from_environment
         dbtype = (ENV['LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE'] || '').strip.downcase
-        case dbtype
-        when 'postgres', 'postgresql'
-          {
-            :require => 'pg',
-            :database_gem_name => 'pg',
-            :config => {
-              :adapter => 'postgresql',
-              :database => 'myapp_test',
-              :username => 'postgres',
-              :min_messages => 'WARNING'
+        is_jruby = defined?(RUBY_ENGINE) && RUBY_ENGINE == 'jruby'
+
+        if is_jruby
+          case dbtype
+          when 'mysql'
+            {
+              :require => 'activerecord-jdbcmysql-adapter',
+              :database_gem_name => 'activerecord-jdbcmysql-adapter',
+              :config => {
+                :adapter => 'jdbcmysql',
+                :database => 'myapp_test',
+                :username => 'travis',
+                :encoding => 'utf8'
+              }
             }
-          }
-        when 'mysql'
-          {
-            :require => 'mysql2',
-            :database_gem_name => 'mysql2',
-            :config => {
-              :adapter => 'mysql2',
-              :database => 'myapp_test',
-              :username => 'travis',
-              :encoding => 'utf8'
-            }
-          }
-        when 'sqlite'
-          {
-            :require => 'sqlite3',
-            :database_gem_name => 'sqlite3',
-            :config => {
-              :adapter => 'sqlite3',
-              :database => ':memory:',
-              :timeout => 500
-            }
-          }
-        when '', nil then nil
+          when '', nil then nil
+          else
+            raise "Unknown Travis CI database type: #{dbtype.inspect}"
+          end
         else
-          raise "Unknown Travis CI database type: #{dbtype.inspect}"
+          case dbtype
+          when 'postgres', 'postgresql'
+            {
+              :require => 'pg',
+              :database_gem_name => 'pg',
+              :config => {
+                :adapter => 'postgresql',
+                :database => 'myapp_test',
+                :username => 'postgres',
+                :min_messages => 'WARNING'
+              }
+            }
+          when 'mysql'
+            {
+              :require => 'mysql2',
+              :database_gem_name => 'mysql2',
+              :config => {
+                :adapter => 'mysql2',
+                :database => 'myapp_test',
+                :username => 'travis',
+                :encoding => 'utf8'
+              }
+            }
+          when 'sqlite'
+            {
+              :require => 'sqlite3',
+              :database_gem_name => 'sqlite3',
+              :config => {
+                :adapter => 'sqlite3',
+                :database => ':memory:',
+                :timeout => 500
+              }
+            }
+          when '', nil then nil
+          else
+            raise "Unknown Travis CI database type: #{dbtype.inspect}"
+          end
         end
       end
 
