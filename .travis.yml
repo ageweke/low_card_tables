@@ -2,6 +2,7 @@ rvm:
     - "1.8.7"
 env:
     - LOW_CARD_TABLES_AR_TEST_VERSION=3.0.20 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=mysql
+    - LOW_CARD_TABLES_AR_TEST_VERSION=3.0.20 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=postgres
 before_script:
     - mysql -e 'create database myapp_test;'
     - psql -c 'create database myapp_test;' -U postgres
