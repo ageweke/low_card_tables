@@ -77,7 +77,7 @@ module LowCardTables
               result = block.call(options)
             ensure
               if is_low_card
-                model_class_to_use.connection.schema_cache.clear! if model_class_to_use.connection.respond_to?(:schema_cache)
+                LowCardTables::VersionSupport.clear_schema_cache!(model_class_to_use)
                 model_class_to_use.reset_column_information
                 new_columns = model_class_to_use._low_card_value_column_names
 

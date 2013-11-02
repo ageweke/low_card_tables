@@ -13,7 +13,7 @@ module LowCardTables
           migration_class.migrate(:up)
         end
 
-        ::ActiveRecord::Base.connection.schema_cache.clear! if ::ActiveRecord::Base.connection.respond_to?(:schema_cache)
+        LowCardTables::VersionSupport.clear_schema_cache!(::ActiveRecord::Base)
       end
 
       def define_model_class(name, table_name, &block)

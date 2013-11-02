@@ -14,6 +14,8 @@ describe "LowCardTables migration support" do
     # a low-card model. Once defined, it's impossible to remove these classes from ActiveRecord::Base.descendants,
     # which is what we use to look for these classes.
     @table_name = "lctables_sus_#{rand(1_000_000_000)}".to_sym
+
+    LowCardTables::VersionSupport.clear_schema_cache!(::ActiveRecord::Base)
   end
 
   after :each do
@@ -325,6 +327,7 @@ describe "LowCardTables migration support" do
 
       @remove_column_proc.call(tn, { })
 
+      ::UserStatusBackdoor.reset_column_information
       ::UserStatusBackdoor.count.should == 3
 
       user123_status = ::UserStatusBackdoor.find(user1.user_status_id)
@@ -525,6 +528,7 @@ describe "LowCardTables migration support" do
         ::UserStatusBackdoor.count.should >= 6
         ::UserStatusBackdoor.count.should <= 12
 
+        ::UserStatusBackdoor.reset_column_information
         all_user_status_ids = ::UserStatusBackdoor.all.map(&:id)
 
         ::User.all.each do |verify_user|

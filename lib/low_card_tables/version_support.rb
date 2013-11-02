@@ -1,6 +1,14 @@
 module LowCardTables
   class VersionSupport
     class << self
+      def clear_schema_cache!(model)
+        if model.connection.respond_to?(:schema_cache)
+          model.connection.schema_cache.clear!
+        elsif model.connection.respond_to?(:clear_cache!)
+          model.connection.clear_cache!
+        end
+      end
+
       def default_scopes_accept_a_block?
         ! (::ActiveRecord::VERSION::MAJOR <= 3 && ::ActiveRecord::VERSION::MINOR == 0)
       end
