@@ -17,12 +17,6 @@ module LowCardTables
         (::ActiveRecord::VERSION::MAJOR <= 3 && ::ActiveRecord::VERSION::MINOR == 0)
       end
 
-      def mysql_gem_version_spec
-        if (::ActiveRecord::VERSION::MAJOR <= 3 && ::ActiveRecord::VERSION::MINOR == 0)
-          "~> 0.2"
-        end
-      end
-
       def define_default_scope(klass, conditions)
         if default_scopes_accept_a_block?
           if conditions
