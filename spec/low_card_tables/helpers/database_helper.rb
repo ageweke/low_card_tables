@@ -29,6 +29,11 @@ module LowCardTables
         require 'stringio'
         @logs = StringIO.new
         ::ActiveRecord::Base.logger = Logger.new(@logs)
+
+        if config[:config][:adapter] == 'sqlite3'
+          sqlite_version = ::ActiveRecord::Base.connection.send(:sqlite_version).instance_variable_get("@version").inspect rescue "unknown"
+          $stderr.puts "SQLite Version: #{sqlite_version}"
+        end
       end
 
       def table_name(name)
