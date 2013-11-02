@@ -111,6 +111,8 @@ to have a column named that at all. Did you misspell it? Or perhaps something el
       def update_collapsed_rows(collapse_map, collapsing_update_scheme)
         if collapsing_update_scheme.respond_to?(:call)
           collapsing_update_scheme.call(collapse_map)
+        elsif collapsing_update_scheme == :none
+          # nothing to do
         else
           row_chunk_size = collapsing_update_scheme
           current_id = @model_class.order("#{@model_class.primary_key} ASC").first.id
