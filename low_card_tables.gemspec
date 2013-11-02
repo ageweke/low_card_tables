@@ -59,6 +59,8 @@ Gem::Specification.new do |s|
   require File.expand_path(File.join(File.dirname(__FILE__), 'spec', 'low_card_tables', 'helpers', 'database_helper'))
   database_gem_name = LowCardTables::Helpers::DatabaseHelper.maybe_database_gem_name
 
+  $stderr.puts "ar_version: #{ar_version.inspect}; database_gem_name: #{database_gem_name.inspect}"
+
   # Ugh. Later versions of the 'mysql2' gem are incompatible with AR 3.0.x; so, here, we explicitly trap that case
   # and use an earlier version of that Gem.
   if database_gem_name && database_gem_name == 'mysql2' && ar_version && ar_version =~ /^3\.0\./
