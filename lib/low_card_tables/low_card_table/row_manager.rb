@@ -111,6 +111,8 @@ module LowCardTables
         end
 
         flush!(:collapse_rows_and_update_referrers)
+
+        collapse_map
       end
 
       def ensure_has_unique_index!(create_if_needed = false)
