@@ -1,3 +1,5 @@
+require 'low_card_tables/version_support'
+
 module LowCardTables
   module Helpers
     class DatabaseHelper
