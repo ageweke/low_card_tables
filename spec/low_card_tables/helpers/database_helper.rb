@@ -12,6 +12,15 @@ module LowCardTables
             nil
           end
         end
+
+        def maybe_database_gem_version_spec
+          begin
+            dh = new
+            dh.database_gem_version_spec
+          rescue InvalidDatabaseConfigurationError => idce
+            nil
+          end
+        end
       end
 
       def initialize
@@ -30,6 +39,10 @@ module LowCardTables
 
       def database_gem_name
         config[:database_gem_name]
+      end
+
+      def database_gem_version_spec
+        config[:database_gem_version_spec]
       end
 
       private
@@ -69,6 +82,7 @@ module LowCardTables
           {
             :require => 'mysql2',
             :database_gem_name => 'mysql2',
+            :database_gem_version_spec => LowCardTables::VersionSupport.mysql_gem_version_spec,
             :config => {
               :adapter => 'mysql2',
               :database => 'myapp_test',

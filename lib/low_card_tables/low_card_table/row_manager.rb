@@ -187,7 +187,7 @@ We're looking for an index on the following columns:
         end
 
         @low_card_model.reset_column_information
-        @low_card_model.connection.schema_cache.clear!
+        @low_card_model.connection.schema_cache.clear! if @low_card_model.connection.respond_to?(:schema_cache)
       end
 
       def create_unique_index!

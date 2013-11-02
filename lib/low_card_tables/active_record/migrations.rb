@@ -29,7 +29,12 @@ module LowCardTables
 
       def change_table_with_low_card_support(table_name, options = { }, &block)
         ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, options) do |new_options|
-          change_table_without_low_card_support(table_name, new_options, &block)
+          ar = method(:change_table_without_low_card_support).arity
+          if ar > 1 || ar < -2
+            change_table_without_low_card_support(table_name, new_options, &block)
+          else
+            change_table_without_low_card_support(table_name, &block)
+          end
         end
       end
 
@@ -72,7 +77,7 @@ module LowCardTables
               result = block.call(options)
             ensure
               if is_low_card
-                model_class_to_use.connection.schema_cache.clear!
+                model_class_to_use.connection.schema_cache.clear! if model_class_to_use.connection.respond_to?(:schema_cache)
                 model_class_to_use.reset_column_information
                 new_columns = model_class_to_use._low_card_value_column_names
 

@@ -101,7 +101,7 @@ describe "LowCardTables caching" do
       new_status.save!
 
       old_status_id = user1.user_status_id
-      ::User.update_all([ "user_status_id = :new_status_id", { :new_status_id => new_status.id } ], [ "id = :id", { :id => user1.id } ])
+      ::User.where([ "id = :id", { :id => user1.id } ]).update_all([ "user_status_id = :new_status_id", { :new_status_id => new_status.id } ])
       user1.user_status_id.should == old_status_id # make sure we didn't touch the existing object
 
       # Make sure we didn't somehow invalidate the cache before this

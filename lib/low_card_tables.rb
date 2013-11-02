@@ -1,6 +1,8 @@
 require 'active_record'
 require 'active_support'
+require 'active_record/migration'
 require "low_card_tables/version"
+require "low_card_tables/version_support"
 require 'low_card_tables/active_record/base'
 require 'low_card_tables/active_record/migrations'
 require 'low_card_tables/active_record/relation'
@@ -19,12 +21,23 @@ class ActiveRecord::Base
 end
 
 class ActiveRecord::Migration
-  def migrate_with_low_card_connection_patching(*args, &block)
-    self.class._low_card_patch_connection_class_if_necessary(connection.class)
-    migrate_without_low_card_connection_patching(*args, &block)
-  end
+  if LowCardTables::VersionSupport.migrate_is_a_class_method?
+    class << self
+      def migrate_with_low_card_connection_patching(*args, &block)
+        _low_card_patch_connection_class_if_necessary(connection.class)
+        migrate_without_low_card_connection_patching(*args, &block)
+      end
 
-  alias_method_chain :migrate, :low_card_connection_patching
+      alias_method_chain :migrate, :low_card_connection_patching
+    end
+  else
+    def migrate_with_low_card_connection_patching(*args, &block)
+      self.class._low_card_patch_connection_class_if_necessary(connection.class)
+      migrate_without_low_card_connection_patching(*args, &block)
+    end
+
+    alias_method_chain :migrate, :low_card_connection_patching
+  end
 
   class << self
     def _low_card_patch_connection_class_if_necessary(connection_class)
