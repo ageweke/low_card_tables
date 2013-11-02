@@ -25,12 +25,12 @@ Imagine you grow to, say, 25,000,000 users.
 
 * You're spending 100 _megabytes_ of database buffer cache just caching these four status flags. (MySQL and PostgreSQL both use a full byte at minimum for any column value.)
 * Do you want to add, say, a `donated` column to the table? With MySQL, be prepared to take your site down for hours as it copies all 25,000,000 rows to a new table, just to add the column.
-* Is one of these columns no longer used? Ditto &mdash; be prepared to take your site down.
-* Indexes on these columns are probably either useless or rarely used. If you're using MySQL, since it can only effectively use one index per query, you'd better hope you happen to include the right combination of status flags in your indexes in advance.
+* Is one of these columns no longer used? Ditto &mdash; be prepared to take your site down if you want to remove that column.
+* Indexes on these columns are probably either useless or rarely used. If you're using MySQL, since it can only effectively use one index per query, the only way an index on those columns will ever be used is if it's a composite index on whatever other columns you're querying on that happens to also include exactly the flags you're constraining on, in the right order. (That's going to be really rare.)
 * Are these columns not entirely independent? (For example, you may always mark someone as `deleted` if they are `deceased`.) Better hope your validations work well, because the database isn't going to enforce that.
 * You also have a less-readable database, because `payment_status` &mdash; which, presumably, is conceptually an `enum` &mdash; is represented using various integers that you just have to remember (or look at the code every time). (If I had a nickel for every time I went around selecting user names to try to figure out which gender is `0` and which gender is `1`...)
 
-You _actually_ may have only, say, 27 combinations of the above values. This is small enough that you can represent it using a single byte (or even just 5 bits). Why are we doing all of the above?
+You _actually_ may have only, say, 27 combinations of the above values. This is small enough that you can represent it using a single byte (or even just 5 bits). Why are we going through all of the above pain?
 
 ### After:
 
@@ -60,7 +60,7 @@ You _actually_ may have only, say, 27 combinations of the above values. This is 
     |       ..............................................          |
 
 * You just got 75 megabytes of precious database buffer cache back.
-* O(0) additional database queries: The contents of the `user_statuses` table is cached in memory; it is not needed to select, update, insert, or delete rows in the `users` table.
+* Wait, but now you have to join to `user_statuses`, right? __No__, you don’t &mdash; `low_card_tables` caches that entire (small!) table in memory, refreshing it automatically, so that SELECT, INSERT, UPDATE, and DELETE on `users` require, on average, zero queries to `user_statuses`.
 * Adding enum-style columns is now instantaneous, because you're migrating a table with 27 rows, not 25 million.
 * Removing these columns is now instantaneous, too.
 * Adding an index on `user_status_id`, or adding it to another, compound index, will allow you to efficiently search all those columns at once. (This is especially useful with PostgreSQL's partial-index feature.)
@@ -197,8 +197,8 @@ Say we have a `users` table with 25,000,000 rows as above, and we want to migrat
 
 1. Add, and run, a migration that creates the `user_statuses` table as above. This will obviously be basically instantaneous.
 1. Add, and run, a migration that adds a `user_status_id` column to `users`. This will be painfully bad (if you're using MySQL) or slow but not painful (if you're using PostgreSQL) &mdash; but you only have to do this once, ever, and there's no way around it.
-1. Define the models as above, but, in the `User` model, say `has_low_card_table :status, :delegate => false`. The low-card system will generally not overwrite real attributes (your `users.deleted`, `users.gender`, etc. columns) with its pseudo-attributes anyway, but this forces it not to.
-1. In your `User` model, override `deleted=`, `gender=`, and so on to set both the old and the new data &mdash; _e.g._, `def deleted=(x); self[:deleted] = x; self.status.deleted = x; end`. This will keep your data in sync while the migration process is ongoing.
+1. Define the models as above, but, in the `User` model, say `has_low_card_table :status, :delegate => false`. The low-card system will generally not overwrite real attributes (your `users.deleted`, `users.gender`, etc. columns) with its pseudo-attributes anyway, but this forces it not to, to be extra-safe.
+1. In your `User` model, override `deleted=`, `gender=`, and so on to set both the old and the new data &mdash; _e.g._, `def deleted=(x); self[:deleted] = x; self.status.deleted = x; end`. This will keep your data in sync while the migration process is ongoing. Deploy this code.
 1. (The simple version) Write a script that iterates through your users, and, for each one, does something like: `u.status.deleted = u.deleted; u.status.deceased = u.deceased; u.status.gender = u.gender; u.status.payment_status = u.payment_status; u.save!`. This will copy over the existing values to the new low-card status values.
 1. (The complex version) Do the same, but in bulk: load in a thousand (or 10,000) `User` models at once &mdash; or even just Hashes, using `User.connection.select_all`, because that's much faster than using ActiveRecord models. Extract from all of them a Hash containing these four attributes, and `uniq` that list. Now, call `UserStatus.low_card_find_or_create_ids_for`, and pass in that array of `Hash`es. You'll get back a `Hash` mapping each of those `Hash`es to the correct low-card status ID (which will be created for you). Now, use the `activerecord-import` gem (which you now have, since it's a dependency of `low_card_tables` anyway) to update just that one column, in bulk, using its `:on_duplicate_key_update` functionality. This is considerably more complex than the previous step, but is probably several orders of magnitude faster.
 1. Once this is complete, change your overrides of `User.deleted=` (and so on) to only change the new data &mdash; _e.g._, `def deleted=(x); self.status.deleted = x; end`. You still need these present because `low_card_tables` will not override real columns on the `User` model with its own pseudo-columns.
