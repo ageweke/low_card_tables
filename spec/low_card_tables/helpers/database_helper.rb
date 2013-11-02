@@ -24,6 +24,11 @@ module LowCardTables
         require 'active_record'
         require config[:require]
         ::ActiveRecord::Base.establish_connection(config[:config])
+
+        require 'logger'
+        require 'stringio'
+        @logs = StringIO.new
+        ::ActiveRecord::Base.logger = Logger.new(@logs)
       end
 
       def table_name(name)
