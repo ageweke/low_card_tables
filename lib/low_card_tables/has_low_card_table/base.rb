@@ -5,36 +5,86 @@ require 'low_card_tables/has_low_card_table/low_card_dynamic_method_manager'
 
 module LowCardTables
   module HasLowCardTable
+    # This module gets included (once) into any class that has declared a reference to at least one low-card table,
+    # using #has_low_card_table. It is just a holder for several related objects that do all the actual work of
+    # implementing the referring side of the low-card system.
     module Base
+      # Documentation for class methods that get included via the ClassMethods module (which ActiveSupport::Concern
+      # picks up).
+
+      ##
+      # :singleton-method: has_low_card_table
+      # :call-seq:
+      #   has_low_card_table(association_name, options = nil)
+      #
+      # Declares that this model class has a reference to a low-card table. +association_name+ is the name of the
+      # association to create. +options+ can contain:
+      #
+      # [:delegate] If nil, no methods will be created in this class that delegate to the low-card table at all.
+      #             If an Array, only methods matching those strings/symbols will be created.
+      #             If a Hash, must contain a single key, +:except+, which maps to an Array; all methods except those
+      #             methods will be created.
+      #             Not specifying +:delegate+ causes it to delegate all methods in the low-card table.
+      # [:prefix] If true, then delegated methods will be named with a prefix of the association name -- for example,
+      #           +status_deleted+, +status_donation_level+, and so on.
+      #           If a String or Symbol, then delegated methods will be named with that prefix -- for example,
+      #           +foo_deleted+, +foo_donation_level+, and so on.
+      #           Not specifying +:prefix+ is the same as saying +:prefix+ => +nil+, which causes methods not to be
+      #           prefixed with anything.
+      # [:foreign_key] Specifies the column in the referring table that contains the foreign key to the low-card table,
+      #                just as in ActiveRecord associations. If not specified, it defaults to
+      #                #{self.name.underscore}_#{association_name}_id -- for example, +user_status_id+.
+      # [:class] Specifies the model class of the low-card table, as a String, Symbol, or Class object. If not
+      #          specified, defaults to ("#{self.name.underscore.singularize}_#{association_name}".camelize.constantize)
+      #          -- for example, +UserStatus+.
+
+      ##
+      # :singleton-method: low_card_value_collapsing_update_scheme
+      # :call-seq:
+      #    low_card_value_collapsing_update_scheme(scheme)
+      #
+      # Tells the low-card tables system what to do when a low-card table we refer to removes a column, which causes
+      # it to collapse rows and thus necessitiates updating the referring column.
+      #
+      # * If called with no arguments, returns the current scheme.
+      # * If passed an integer >= 1, automatically updates referring columns in this table, in chunks of that many
+      #   rows. This is the default, with a value of 10,000.
+      # * If passed an object that responds to #call, then, when columns need to be updated, the passed object is called
+      #   with a Hash. This Hash has, as keys, instances of the low-card model class; these are the rows that will be
+      #   preserved. Each key maps to an Array of one or more instances of the low-card model class; these are the
+      #   rows that are to be replaced with the key. The passed object is then responsible for updating any values that
+      #   correspond to rows in a value Array with the corresponding key value.
+      # * If passed +:none+, then no updating is performed at all. You're on your own -- and you will have dangling
+      #   foreign keys if you do nothing.
+
       extend ActiveSupport::Concern
 
-      module ClassMethods
-        delegate :has_low_card_table, :to => :_low_card_associations_manager
 
+      module ClassMethods
+        # Several methods go straight to the LowCardAssociationsManager.
+        delegate :has_low_card_table, :_low_card_association, :_low_card_update_collapsed_rows, :low_card_value_collapsing_update_scheme, :to => :_low_card_associations_manager
+
+        # This overrides the implementation in LowCardTables::ActiveRecord::Base -- the only way we get included in
+        # a class is if that class has declared has_low_card_table to at least one table.
         def has_any_low_card_tables?
           true
         end
 
+        # The LowCardAssociationsManager keeps track of which low-card tables this table refers to; see its
+        # documentation for more information.
         def _low_card_associations_manager
           @_low_card_associations_manager ||= LowCardTables::HasLowCardTable::LowCardAssociationsManager.new(self)
         end
 
-        def _low_card_association(name)
-          _low_card_associations_manager._low_card_association(name)
-        end
-
-        def _low_card_update_collapsed_rows(low_card_model, collapse_map)
-          _low_card_associations_manager._low_card_update_collapsed_rows(low_card_model, collapse_map)
-        end
-
-        def low_card_value_collapsing_update_scheme(new_scheme = nil)
-          _low_card_associations_manager.low_card_value_collapsing_update_scheme(new_scheme)
-        end
-
+        # The LowCardDynamicMethodManager is responsible for maintaining the right delegated method names in the
+        # _low_card_dynamic_methods_module; see its documentation for more information.
         def _low_card_dynamic_method_manager
           @_low_card_dynamic_method_manager ||= LowCardTables::HasLowCardTable::LowCardDynamicMethodManager.new(self)
         end
 
+        # This maintains a single module that gets included into this class; it is the place where we add all
+        # delegated methods. We use a module rather than defining them directly on this class so that users can still
+        # override them and use #super to call our implementation, if desired.
         def _low_card_dynamic_methods_module
           @_low_card_dynamic_methods_module ||= begin
             out = Module.new
@@ -45,10 +95,17 @@ module LowCardTables
         end
       end
 
+      # Updates the current values of all low-card reference columns according to the current attributes. This is
+      # automatically called in a #before_save hook; you can also call it yourself at any time. Note that this can
+      # cause new low-card rows to be created, if the current combination of attributes for a given low-card table
+      # has not been used before.
       def low_card_update_foreign_keys!
         self.class._low_card_associations_manager.low_card_update_foreign_keys!(self)
       end
 
+      # Returns the LowCardObjectsManager, which is responsible for maintaining the set of low-card objects accessed
+      # by this model object -- the instances of the low-card class that are "owned" by this object. See that class's
+      # documentation for more information.
       def _low_card_objects_manager
         @_low_card_objects_manager ||= LowCardTables::HasLowCardTable::LowCardObjectsManager.new(self)
       end

@@ -55,7 +55,7 @@ module LowCardTables
 
       DEFAULT_COLLAPSING_UPDATE_VALUE = 10_000
 
-      def low_card_value_collapsing_update_scheme(new_scheme)
+      def low_card_value_collapsing_update_scheme(new_scheme = nil)
         if (! new_scheme)
           @collapsing_update_scheme
         elsif new_scheme == :default || new_scheme == :none

@@ -5,7 +5,7 @@ require 'low_card_tables/has_low_card_table/base'
 
 module LowCardTables
   module ActiveRecord
-    # This module gets included into ::ActiveRecord::Migrations, and overrides key methods (using alias_method_chain)
+    # This module gets included into ::ActiveRecord::Migrations, and overrides key methods (using +alias_method_chain+)
     # to add low-card support. Its job is to detect if a low-card table is being modified, and, if so:
     #
     # * Remove the all-columns unique index before the operation in question, and add it back afterwards
