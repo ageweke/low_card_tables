@@ -1,8 +1,16 @@
 module LowCardTables
   module HasLowCardTable
+    # A LowCardAssociation represents a single association between a referring model class and a referred-to low-card
+    # model class. Note that this represents an association between _classes_, not between _objects_ -- that is, there
+    # is one instance of this class for a relationship from one referring class to one referred-to class, no matter
+    # how many model objects are instantiated.
     class LowCardAssociation
+      # Returns the name of the association -- this will always have been the first arguent to +has_low_card_table+.
       attr_reader :association_name
 
+      # Creates a new instance. model_class is the Class (which must inherit from ActiveRecord::Base) that is the
+      # referring model; association_name is the name of the association. options can contain any of the options
+      # accepted by LowCardTables::HasLowCardTables::Base#has_low_card_table.
       def initialize(model_class, association_name, options)
         @model_class = model_class
         @association_name = association_name.to_s
