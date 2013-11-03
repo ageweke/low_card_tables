@@ -93,11 +93,10 @@ module LowCardTables
           #
           # ...actually translates internally to a call to remove_column inside change_table, and, otherwise, we'll
           # try to do our work twice, which is bad news.
+          (options, low_card_options) = partition_low_card_options(options)
           return block.call(options) if inside_migrations_check?
 
-          (options, low_card_options) = partition_low_card_options(options)
           low_card_model = low_card_model_to_use_for(table_name, low_card_options)
-
           return block.call(options) if (! low_card_model)
 
           with_migrations_check do

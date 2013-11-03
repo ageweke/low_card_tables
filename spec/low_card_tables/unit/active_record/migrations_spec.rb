@@ -50,7 +50,7 @@ describe LowCardTables::ActiveRecord::Migrations do
 
       application = Object.new
 
-      expect(rails_class).to receive(:application).once.and_return(application)
+      expect(rails_class).to receive(:application).at_least(:once).and_return(application)
       expect(application).to receive(:eager_load!).once
     end
 
@@ -191,7 +191,7 @@ describe LowCardTables::ActiveRecord::Migrations do
 
         expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
 
-        inner_opts = { :a => :b }
+        inner_opts = { :a => :b, :low_card_foo => :bar }
         @proc = lambda do
           remove_column :bar, :baz, inner_opts
         end
@@ -199,7 +199,7 @@ describe LowCardTables::ActiveRecord::Migrations do
         @migration.create_table(:foo, @opts, &@proc)
         @migration.calls.should == [
           { :name => :create_table, :args => [ :foo, { :foo => :bar } ], :block => @proc },
-          { :name => :remove_column, :args => [ :bar, :baz, inner_opts ], :block => nil }
+          { :name => :remove_column, :args => [ :bar, :baz, { :a => :b } ], :block => nil }
         ]
       end
     end
