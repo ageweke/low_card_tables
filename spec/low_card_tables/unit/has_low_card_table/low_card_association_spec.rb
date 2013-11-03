@@ -36,7 +36,9 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
       {
         ::ModelClassNameAscName => 'Class object',
         'ModelClassNameAscName' => 'String',
-        :ModelClassNameAscName => 'Symbol'
+        :ModelClassNameAscName => 'Symbol',
+        :model_class_name_asc_name => 'Symbol (underscored)',
+        'model_class_name_asc_name' => 'String (underscored)'
       }.each do |input, description|
         it "should allow setting the referred-to class name by #{description}" do
           allow(@col3).to receive(:name).and_return("model_class_name_foobar_id")
@@ -49,12 +51,69 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
       end
 
       it "should allow setting the foreign key" do
-        association = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :foobar, { })
+        association = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :foobar, { :class => ModelClassNameAscName, :foreign_key => :model_class_name_asc_name_id })
 
         association.association_name.should == 'foobar'
         association.foreign_key_column_name.should == 'model_class_name_asc_name_id'
         association.low_card_class.should be(::ModelClassNameAscName)
       end
     end
+  end
+
+  it "should fail instantiation if the foreign key specified isn't a column" do
+    lambda do
+      LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :foobar,
+        { :class => ModelClassNameAscName, :foreign_key => :bogus_id })
+    end.should raise_error(ArgumentError, /bogus_id/i)
+  end
+
+  it "should fail instantiation if the foreign key inferred isn't a column" do
+    allow(@col3).to receive(:name).and_return("whatever")
+    lambda do
+      LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :foobar,
+        { :class => ModelClassNameAscName })
+    end.should raise_error(ArgumentError, /model_class_name_foobar_id/i)
+  end
+
+  it "should fail instantiation if the class inferred can't be found" do
+    allow(@col3).to receive(:name).and_return("model_class_name_yohoho_id")
+    lambda do
+      LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :yohoho, { })
+    end.should raise_error(ArgumentError, /ModelClassNameYohoho/i)
+  end
+
+  it "should fail instantiation if the class specified can't be found" do
+    allow(@col3).to receive(:name).and_return("model_class_name_yohoho_id")
+    lambda do
+      LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :yohoho, { :class => :FooBar })
+    end.should raise_error(ArgumentError, /FooBar/i)
+  end
+
+  it "should fail instantiation if the class specified isn't a Class" do
+    ::Object.const_set(:FooBar1, "hi")
+
+    allow(@col3).to receive(:name).and_return("model_class_name_yohoho_id")
+    lambda do
+      LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :yohoho, { :class => :FooBar1 })
+    end.should raise_error(ArgumentError, /\"hi\"/i)
+  end
+
+  it "should fail instantiation if the class specified doesn't respond to is_low_card_table" do
+    klass = Class.new
+
+    allow(@col3).to receive(:name).and_return("model_class_name_yohoho_id")
+    lambda do
+      LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :yohoho, { :class => klass })
+    end.should raise_error(ArgumentError, /is_low_card_table/i)
+  end
+
+  it "should fail instantiation if the class specified isn't a low-card table Class" do
+    klass = Class.new
+    expect(klass).to receive(:is_low_card_table?).and_return(false)
+
+    allow(@col3).to receive(:name).and_return("model_class_name_yohoho_id")
+    lambda do
+      LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :yohoho, { :class => klass })
+    end.should raise_error(ArgumentError, /is_low_card_table/i)
   end
 end

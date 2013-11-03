@@ -109,7 +109,9 @@ module LowCardTables
           unless column
             raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name}, and we
 have a foreign-key column name of #{out.inspect}, but #{model_class} doesn't seem
-to have a column named that at all. Did you misspell it? Or perhaps something else is wrong?}
+to have a column named that at all. Did you misspell it? Or perhaps something else is wrong?
+
+The model class has these columns: #{model_class.columns.map(&:name).sort.join(", ")}}
           end
 
           out
