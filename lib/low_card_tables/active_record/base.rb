@@ -43,7 +43,9 @@ module LowCardTables
           has_low_card_table(*args)
         end
 
-        # Does this model reference any low-card tables?
+        # Does this model reference any low-card tables? This implementation just returns false -- if this is
+        # a low-card table, then it will have had the LowCardTables::HasLowCardTable::Base module included in
+        # after this one, and that implementation will return true.
         def has_any_low_card_tables?
           false
         end
