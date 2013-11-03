@@ -25,7 +25,7 @@ describe LowCardTables::ActiveRecord::Migrations do
 
   before :each do
     @migration = MockMigrationClass.new
-    @opts = Hash.new
+    @opts = { }
     @proc = lambda { }
   end
 
@@ -45,29 +45,57 @@ describe LowCardTables::ActiveRecord::Migrations do
       expect(application).to receive(:eager_load!).once
     end
 
-    it "should call #eager_load, pick up an AR descendant properly, and enforce the index" do
-      class1 = Object.new
-      class2 = Object.new
+    context "without mock low-card model" do
+      it "should create a temporary low-card model if :low_card => true" do
+        @opts[:low_card] = true
 
-      expect(class1).to receive(:table_name).and_return('bar')
-      expect(class2).to receive(:table_name).and_return('foo')
+        temp_class = Class.new
+        expect(Class).to receive(:new).once.with(::ActiveRecord::Base).and_return(temp_class).ordered
+        expect(temp_class).to receive(:table_name=).once.with(:foo).ordered
+        expect(temp_class).to receive(:is_low_card_table).once.with().ordered
+        expect(temp_class).to receive(:reset_column_information).once.ordered
 
-      expect(class2).to receive(:is_low_card_table?).and_return(true)
-      expect(class2).to receive(:name).at_least(:once).and_return('Whatever')
+        expect(temp_class).to receive(:_low_card_remove_unique_index!).once.ordered
 
-      expect(::ActiveRecord::Base).to receive(:descendants).and_return([ class1, class2 ])
+        expect(temp_class).to receive(:reset_column_information).at_least(2).times.ordered
+        expect(temp_class).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
 
-      expect(class2).to receive(:_low_card_remove_unique_index!).once.ordered
+        expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(temp_class)
 
-      expect(class2).to receive(:reset_column_information).exactly(3).times.ordered
-      expect(class2).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
+        expect(temp_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
 
-      expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(class2)
+        @migration.create_table(:foo, @opts, &@proc)
+        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { } ], :block => @proc } ]
+      end
+    end
 
-      expect(class2).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+    context "with mock low-card model" do
+      before :each do
+        non_low_card_class = Object.new
+        @low_card_class = Object.new
 
-      @migration.create_table(:foo, @opts, &@proc)
-      @migration.calls.should == [ { :name => :create_table, :args => [ :foo, @opts ], :block => @proc } ]
+        expect(non_low_card_class).to receive(:table_name).and_return('bar')
+        expect(@low_card_class).to receive(:table_name).and_return('foo')
+
+        expect(@low_card_class).to receive(:is_low_card_table?).and_return(true)
+        expect(@low_card_class).to receive(:name).at_least(:once).and_return('Whatever')
+
+        expect(::ActiveRecord::Base).to receive(:descendants).and_return([ non_low_card_class, @low_card_class ])
+      end
+
+      it "should call #eager_load, pick up an AR descendant properly, and enforce the index" do
+        expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+
+        expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
+        expect(@low_card_class).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
+
+        expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+
+        expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+
+        @migration.create_table(:foo, @opts, &@proc)
+        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, @opts ], :block => @proc } ]
+      end
     end
   end
 end
