@@ -34,7 +34,7 @@ describe LowCardTables::ActiveRecord::Migrations do
   before :each do
     @migration = MockMigrationClass.new
     @opts = { }
-    @proc = lambda { }
+    @proc = lambda { |*args| }
   end
 
   it "should pass through correctly for :create_table" do
@@ -105,7 +105,7 @@ describe LowCardTables::ActiveRecord::Migrations do
             end
 
             @proc = case @method
-            when :create_table, :change_table then lambda { }
+            when :create_table, :change_table then lambda { |*args| }
             else nil
             end
           end
@@ -192,7 +192,7 @@ describe LowCardTables::ActiveRecord::Migrations do
         expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
 
         inner_opts = { :a => :b, :low_card_foo => :bar }
-        @proc = lambda do
+        @proc = lambda do |*args|
           remove_column :bar, :baz, inner_opts
         end
 
