@@ -47,10 +47,6 @@ module LowCardTables
         out
       end
 
-      def model_constraints_for_query(query_constraints)
-        low_card_class.low_card_ids_matching(query_constraints)
-      end
-
       # Returns an Array of names of methods on the low-card table that should be delegated to. This may be different
       # than the names of methods on the referring class, because of the :prefix option.
       def delegated_method_names
@@ -82,6 +78,8 @@ module LowCardTables
         end
       end
 
+      # Given an instance of the referring class, returns an instance of the low-card class that is configured correctly
+      # for the current value of the referring column.
       def create_low_card_object_for(model_instance)
         ensure_correct_class!(model_instance)
 
@@ -89,7 +87,7 @@ module LowCardTables
 
         out = nil
         if id
-          template = low_card_class.low_card_row_for_id(get_id_from_model(model_instance))
+          template = low_card_class.low_card_row_for_id(id)
           out = template.dup
           out.id = nil
           out
@@ -100,6 +98,7 @@ module LowCardTables
         out
       end
 
+      # Computes the correct name of the foreign-key column based on the options passed in.
       def foreign_key_column_name
         @foreign_key_column_name ||= begin
           out = options[:foreign_key]
@@ -125,6 +124,9 @@ The model class has these columns: #{model_class.columns.map(&:name).sort.join("
         end
       end
 
+      # When a low-card table has a column removed, it will typically have duplicate rows; these duplicate rows are
+      # then deleted. But then referring tables need to be updated. This method gets called at that point, with a map
+      # of <winner row> => <array of loser rows>, and the collapsing_update_scheme declared by
       def update_collapsed_rows(collapse_map, collapsing_update_scheme)
         if collapsing_update_scheme.respond_to?(:call)
           collapsing_update_scheme.call(collapse_map)

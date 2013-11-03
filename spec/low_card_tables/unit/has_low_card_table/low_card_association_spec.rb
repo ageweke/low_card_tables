@@ -193,4 +193,65 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
         'quux_baz' => 'baz', 'quux_baz=' => 'baz=' })
     end
   end
+
+  context "with a valid instance" do
+    before :each do
+      expect(ModelClassNameAscName).to receive(:_low_card_referred_to_by).once.with(@model_class)
+      @association = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :asc_name, { })
+    end
+
+    describe "#create_low_card_object_for" do
+      it "should fail if passed something of the wrong class" do
+        lambda { @association.create_low_card_object_for("foo") }.should raise_error(/foo/i)
+      end
+
+      it "should return an empty object if there's no ID" do
+        instance = @model_class.new
+        expect(instance).to receive(:[]).with('model_class_name_asc_name_id').and_return(nil)
+
+        rv = Object.new
+        expect(ModelClassNameAscName).to receive(:new).once.and_return(rv)
+
+        obj = @association.create_low_card_object_for(instance)
+        obj.should be(rv)
+      end
+
+      it "should return a duplicated object if there is an ID" do
+        instance = @model_class.new
+        expect(instance).to receive(:[]).with('model_class_name_asc_name_id').and_return(12345)
+
+        template = Object.new
+        expect(ModelClassNameAscName).to receive(:low_card_row_for_id).once.with(12345).and_return(template)
+
+        rv = Object.new
+        expect(template).to receive(:dup).once.and_return(rv)
+        expect(rv).to receive(:id=).once.with(nil)
+
+        obj = @association.create_low_card_object_for(instance)
+        obj.should be(rv)
+      end
+    end
+
+    describe "#update_collapsed_rows" do
+      before :each do
+        @map = { :foo => [ :bar, :baz ] }
+      end
+
+      it "should just call it if it's callable" do
+        scheme = Object.new
+        expect(scheme).to receive(:call).once.with(@map)
+
+        @association.update_collapsed_rows(@map, scheme)
+      end
+
+      it "should do nothing if it's :none" do
+        @association.update_collapsed_rows(@map, :none)
+      end
+
+      # We deliberately don't spec, here, the case where we update in batches; we leave it to the system tests.
+      # A unit test would just test some insanely specific and long combination of ActiveRecord calls, and it wouldn't
+      # be a useful test anyway, since you're vastly more likely to make errors in figuring out what the DB needs --
+      # and you'd just spec those errors as well.
+    end
+  end
 end
