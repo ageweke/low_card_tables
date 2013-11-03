@@ -23,6 +23,7 @@ describe "LowCardTables migration support" do
     migrate do
       drop_table tn rescue nil
       drop_table :lctables_spec_users rescue nil
+      drop_table :non_low_card_table rescue nil
     end
   end
 
@@ -36,6 +37,26 @@ describe "LowCardTables migration support" do
     user.awesomeness = awesomeness if awesomeness
     user.save!
     user
+  end
+
+  it "should be able to migrate non-low-card tables" do
+    migrate do
+      create_table :non_low_card_table do |t|
+        t.string :name
+      end
+    end
+
+    migrate do
+      add_column :non_low_card_table, :a, :integer
+    end
+
+    migrate do
+      remove_column :non_low_card_table, :a
+    end
+
+    migrate do
+      drop_table :non_low_card_table
+    end
   end
 
   it "should handle schema changes to the low-card table" do

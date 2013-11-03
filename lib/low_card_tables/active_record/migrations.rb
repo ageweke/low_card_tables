@@ -9,26 +9,26 @@ module LowCardTables
       extend ActiveSupport::Concern
 
       def create_table_with_low_card_support(table_name, options = { }, &block)
-        ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, options) do |new_options|
+        ::LowCardTables::ActiveRecord::Migrations.with_low_card_support(table_name, options) do |new_options|
           create_table_without_low_card_support(table_name, new_options, &block)
         end
       end
 
       def add_column_with_low_card_support(table_name, column_name, type, options = {})
-        ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, options) do |new_options|
+        ::LowCardTables::ActiveRecord::Migrations.with_low_card_support(table_name, options) do |new_options|
           add_column_without_low_card_support(table_name, column_name, type, options)
         end
       end
 
       def remove_column_with_low_card_support(table_name, *column_names)
         options = column_names.pop if column_names[-1] && column_names[-1].kind_of?(Hash)
-        ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, options) do |new_options|
+        ::LowCardTables::ActiveRecord::Migrations.with_low_card_support(table_name, options) do |new_options|
           remove_column_without_low_card_support(table_name, *column_names)
         end
       end
 
       def change_table_with_low_card_support(table_name, options = { }, &block)
-        ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, options) do |new_options|
+        ::LowCardTables::ActiveRecord::Migrations.with_low_card_support(table_name, options) do |new_options|
           ar = method(:change_table_without_low_card_support).arity
           if ar > 1 || ar < -2
             change_table_without_low_card_support(table_name, new_options, &block)
@@ -39,7 +39,7 @@ module LowCardTables
       end
 
       def change_low_card_table(table_name, &block)
-        ::LowCardTables::ActiveRecord::Migrations.verify_unique_index_as_needed(table_name, { :low_card => true }) do |new_options|
+        ::LowCardTables::ActiveRecord::Migrations.with_low_card_support(table_name, { :low_card => true }) do |new_options|
           block.call
         end
       end
@@ -52,52 +52,88 @@ module LowCardTables
       end
 
       class << self
-        def verify_unique_index_as_needed(table_name, options = { }, &block)
-          return block.call(options) if Thread.current[:_low_card_in_verify_unique_index_as_needed]
+        def with_low_card_support(table_name, options = { }, &block)
+          return block.call(options) if inside_migrations_check?
 
-          Thread.current[:_low_card_in_verify_unique_index_as_needed] = true
-          begin
-            options = (options || { }).dup
+          (options, low_card_options) = partition_low_card_options(options)
+          low_card_model = low_card_model_to_use_for(table_name, low_card_options)
 
-            low_card_options = { }
-            options.keys.each do |k|
-              low_card_options[k] = options.delete(k) if k.to_s =~ /^low_card/
-            end
+          return block.call(options) if (! low_card_model)
 
-            low_card_model = existing_low_card_model_for(table_name)
-
-            model_class_to_use = low_card_model || temporary_model_class_for(table_name)
-            is_low_card = (low_card_options[:low_card] || low_card_model)
-
-            model_class_to_use.reset_column_information
-            previous_columns = model_class_to_use._low_card_value_column_names
-
-            begin
-              model_class_to_use._low_card_remove_unique_index! if is_low_card
-              result = block.call(options)
-            ensure
-              if is_low_card
-                LowCardTables::VersionSupport.clear_schema_cache!(model_class_to_use)
-                model_class_to_use.reset_column_information
-                new_columns = model_class_to_use._low_card_value_column_names
-
-                if (previous_columns - new_columns).length > 0
-                  model_class_to_use.low_card_collapse_rows_and_update_referrers!(low_card_options)
-                end
-
-                unless low_card_options.has_key?(:low_card_collapse_rows) && (! low_card_options[:low_card_collapse_rows])
-                  model_class_to_use._low_card_ensure_has_unique_index!(true)
-                end
+          with_migrations_check do
+            without_unique_index(low_card_model, low_card_options) do
+              with_removed_column_detection(low_card_model, low_card_options) do
+                block.call(options)
               end
             end
-
-            result
-          ensure
-            Thread.current[:_low_card_in_verify_unique_index_as_needed] = false
           end
         end
 
         private
+        def inside_migrations_check?
+          !! Thread.current[:_low_card_migrations_only_once]
+        end
+
+        def with_migrations_check(&block)
+          begin
+            Thread.current[:_low_card_migrations_only_once] = true
+            block.call
+          ensure
+            Thread.current[:_low_card_migrations_only_once] = false
+          end
+        end
+
+        def with_removed_column_detection(model, low_card_options, &block)
+          previous_columns = fresh_value_column_names(model)
+
+          begin
+            block.call
+          ensure
+            LowCardTables::VersionSupport.clear_schema_cache!(model)
+            model.reset_column_information
+            new_columns = fresh_value_column_names(model)
+
+            if (previous_columns - new_columns).length > 0
+              model.low_card_collapse_rows_and_update_referrers!(low_card_options)
+            end
+          end
+        end
+
+        def without_unique_index(model, low_card_options, &block)
+          return block.call if low_card_options.has_key?(:low_card_collapse_rows) && (! low_card_options[:low_card_collapse_rows])
+
+          begin
+            model._low_card_remove_unique_index!
+            block.call
+          ensure
+            model._low_card_ensure_has_unique_index!(true)
+          end
+        end
+
+        def fresh_value_column_names(model)
+          model.reset_column_information
+          model._low_card_value_column_names
+        end
+
+        def partition_low_card_options(options)
+          options = (options || { }).dup
+          low_card_options = { }
+
+          options.keys.each do |k|
+            if k.to_s =~ /^low_card/
+              low_card_options[k] = options.delete(k)
+            end
+          end
+
+          [ options, low_card_options ]
+        end
+
+        def low_card_model_to_use_for(table_name, low_card_options)
+          out = existing_low_card_model_for(table_name)
+          out ||= temporary_model_class_for(table_name) if low_card_options[:low_card]
+          out
+        end
+
         def temporary_model_class_for(table_name)
           temporary_model_class = Class.new(::ActiveRecord::Base)
           temporary_model_class.table_name = table_name
