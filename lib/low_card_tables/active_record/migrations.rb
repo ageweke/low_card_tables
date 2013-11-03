@@ -23,7 +23,10 @@ module LowCardTables
       def remove_column_with_low_card_support(table_name, *column_names)
         options = column_names.pop if column_names[-1] && column_names[-1].kind_of?(Hash)
         ::LowCardTables::ActiveRecord::Migrations.with_low_card_support(table_name, options) do |new_options|
-          remove_column_without_low_card_support(table_name, *column_names)
+          args = [ table_name ]
+          args += column_names
+          args << new_options if new_options && new_options.size > 0
+          remove_column_without_low_card_support(*args)
         end
       end
 

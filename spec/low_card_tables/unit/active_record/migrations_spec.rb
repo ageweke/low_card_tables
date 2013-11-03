@@ -8,10 +8,18 @@ describe LowCardTables::ActiveRecord::Migrations do
       @calls = [ ]
     end
 
-    %w{create_table add_column remove_column change_table}.each do |method_name|
+    %w{add_column remove_column}.each do |method_name|
+      class_eval %{
+  def #{method_name}(*args)
+    record_call(:#{method_name}, args)
+  end}
+    end
+
+    %w{create_table change_table}.each do |method_name|
       class_eval %{
   def #{method_name}(*args, &block)
     record_call(:#{method_name}, args, &block)
+    instance_eval(&block)
   end}
     end
 
@@ -37,6 +45,7 @@ describe LowCardTables::ActiveRecord::Migrations do
   context "with mock ::Rails" do
     before :each do
       rails_class = Object.new
+      Object.send(:remove_const, :Rails) if Object.const_defined?(:Rails)
       Object.const_set(:Rails, rails_class)
 
       application = Object.new
@@ -84,6 +93,8 @@ describe LowCardTables::ActiveRecord::Migrations do
       end
 
       it "should call #eager_load, pick up an AR descendant properly, and enforce the index" do
+        @opts[:foo] = :bar
+
         expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
 
         expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
@@ -94,7 +105,64 @@ describe LowCardTables::ActiveRecord::Migrations do
         expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
 
         @migration.create_table(:foo, @opts, &@proc)
-        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, @opts ], :block => @proc } ]
+        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { :foo => :bar } ], :block => @proc } ]
+      end
+
+      it "should not reinstitute the index if :low_card_collapse_rows => true" do
+        @opts[:low_card_collapse_rows] = false
+
+        expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+
+        expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
+        expect(@low_card_class).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
+
+        expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+
+        @migration.create_table(:foo, @opts, &@proc)
+        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { } ], :block => @proc } ]
+      end
+
+      it "should detect removed columns" do
+        @opts[:low_card_foo] = :bar
+
+        expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+
+        expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
+        expect(@low_card_class).to receive(:_low_card_value_column_names).once.ordered.and_return([ 'x', 'y' ])
+
+        expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+
+        expect(@low_card_class).to receive(:_low_card_value_column_names).once.ordered.and_return([ 'y' ])
+        expect(@low_card_class).to receive(:low_card_collapse_rows_and_update_referrers!).once.ordered.with(:low_card_foo => :bar)
+
+        expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+
+        @migration.create_table(:foo, @opts, &@proc)
+        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { } ], :block => @proc } ]
+      end
+
+      it "should not do it twice if calls are nested" do
+        @opts[:foo] = :bar
+
+        expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+
+        expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
+        expect(@low_card_class).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
+
+        expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+
+        expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+
+        inner_opts = { :a => :b }
+        @proc = lambda do
+          remove_column :bar, :baz, inner_opts
+        end
+
+        @migration.create_table(:foo, @opts, &@proc)
+        @migration.calls.should == [
+          { :name => :create_table, :args => [ :foo, { :foo => :bar } ], :block => @proc },
+          { :name => :remove_column, :args => [ :bar, :baz, inner_opts ], :block => nil }
+        ]
       end
     end
   end
