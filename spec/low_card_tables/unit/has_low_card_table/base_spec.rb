@@ -25,7 +25,7 @@ describe LowCardTables::HasLowCardTable::Base do
 
     %w{has_low_card_table _low_card_association _low_card_update_collapsed_rows low_card_value_collapsing_update_scheme}.each do |method_name|
       it "should forward ##{method_name} to the LCAM" do
-        args = [ :foo, :bar => :baz ]
+        args = [ :foo, { :bar => :baz } ]
         rv = Object.new
         expect(@lcam).to receive(method_name).once.with(*args).and_return(rv)
 
