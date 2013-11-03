@@ -92,56 +92,94 @@ describe LowCardTables::ActiveRecord::Migrations do
         expect(::ActiveRecord::Base).to receive(:descendants).and_return([ non_low_card_class, @low_card_class ])
       end
 
-      it "should call #eager_load, pick up an AR descendant properly, and enforce the index" do
-        @opts[:foo] = :bar
+      %w{add_column remove_column create_table change_table}.each do |method_name|
+        context "#{method_name}" do
+          before :each do
+            @method = method_name.to_sym
+            @args = case @method
+            when :create_table then [ :foo, { :bar => :baz } ]
+            when :change_table then [ :foo ]
+            when :add_column then [ :foo, :bar, :integer, { :null => false } ]
+            when :remove_column then [ :foo, :bar ]
+            else raise "unknown method_name #{method_name.inspect}"
+            end
 
-        expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+            @proc = case @method
+            when :create_table, :change_table then lambda { }
+            else nil
+            end
+          end
 
-        expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
-        expect(@low_card_class).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
+          def add_option(args, hash)
+            if args[-1].kind_of?(Hash)
+              args[-1].merge!(hash)
+            else
+              args << hash
+            end
+          end
 
-        expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+          def remove_low_card_options(args)
+            out = args.dup
+            if out[-1].kind_of?(Hash)
+              out[-1].delete_if { |k,v| k.to_s =~ /^low_card/ }
+              out.pop if out[-1].size == 0
+            end
+            out
+          end
 
-        expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+          it "should call #eager_load, pick up an AR descendant properly, and enforce the index" do
+            expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
 
-        @migration.create_table(:foo, @opts, &@proc)
-        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { :foo => :bar } ], :block => @proc } ]
+            expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
+            expect(@low_card_class).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
+
+            expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+
+            expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+
+            @migration.send(@method, *@args, &@proc)
+            @migration.calls.should == [ { :name => @method, :args => @args, :block => @proc } ]
+          end
+
+          it "should not reinstitute the index if :low_card_collapse_rows => true" do
+            add_option(@args, :low_card_collapse_rows => false)
+
+            expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+
+            expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
+            expect(@low_card_class).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
+
+            expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+
+            @migration.send(@method, *@args, &@proc)
+
+            expected_args = remove_low_card_options(@args)
+            @migration.calls.should == [ { :name => @method, :args => expected_args, :block => @proc } ]
+          end
+
+          it "should detect removed columns" do
+            add_option(@args, :low_card_foo => :bar)
+
+            expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+
+            expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
+            expect(@low_card_class).to receive(:_low_card_value_column_names).once.ordered.and_return([ 'x', 'y' ])
+
+            expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+
+            expect(@low_card_class).to receive(:_low_card_value_column_names).once.ordered.and_return([ 'y' ])
+            expect(@low_card_class).to receive(:low_card_collapse_rows_and_update_referrers!).once.ordered.with(:low_card_foo => :bar)
+
+            expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+
+            @migration.send(@method, *@args, &@proc)
+            expected_args = remove_low_card_options(@args)
+            @migration.calls.should == [ { :name => @method, :args => expected_args, :block => @proc } ]
+          end
+        end
       end
 
-      it "should not reinstitute the index if :low_card_collapse_rows => true" do
-        @opts[:low_card_collapse_rows] = false
-
-        expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
-
-        expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
-        expect(@low_card_class).to receive(:_low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
-
-        expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
-
-        @migration.create_table(:foo, @opts, &@proc)
-        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { } ], :block => @proc } ]
-      end
-
-      it "should detect removed columns" do
-        @opts[:low_card_foo] = :bar
-
-        expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
-
-        expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
-        expect(@low_card_class).to receive(:_low_card_value_column_names).once.ordered.and_return([ 'x', 'y' ])
-
-        expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
-
-        expect(@low_card_class).to receive(:_low_card_value_column_names).once.ordered.and_return([ 'y' ])
-        expect(@low_card_class).to receive(:low_card_collapse_rows_and_update_referrers!).once.ordered.with(:low_card_foo => :bar)
-
-        expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
-
-        @migration.create_table(:foo, @opts, &@proc)
-        @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { } ], :block => @proc } ]
-      end
-
-      it "should not do it twice if calls are nested" do
+      it "should not do anything twice if calls are nested" do
         @opts[:foo] = :bar
 
         expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
