@@ -13,18 +13,16 @@ module LowCardTables
       include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
 
       module ClassMethods
-        # Declares that this is a low-card table. This should only ever be used on tables that are,
-        # in fact, low-card tables.
-        #
-        # options can contain:
-        #
-        # [:exclude_column_names] Excludes the specified Array of column names from being treated
-        #                         as low-card columns; this happens by default to created_at and
-        #                         updated_at.
+        # Declares that this is a low-card table. This simply includes the LowCardTables::LowCardTable::Base
+        # module, and then calls that module's is_low_card_table method, which is the one that does all
+        # the real work.
         def is_low_card_table(options = { })
-          include LowCardTables::LowCardTable::Base
-          self.low_card_options = options
-          _low_card_disable_save_when_needed!
+          unless @_low_card_is_low_card_table_included
+            include LowCardTables::LowCardTable::Base
+            @_low_card_is_low_card_table_included = true
+          end
+
+          is_low_card_table(options)
         end
 
         def is_low_card_table?

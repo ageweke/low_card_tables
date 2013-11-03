@@ -25,6 +25,21 @@ module LowCardTables
       end
 
       module ClassMethods
+        # Declares that this is a low-card table. This should only ever be used on tables that are,
+        # in fact, low-card tables.
+        #
+        # options can contain:
+        #
+        # [:exclude_column_names] Excludes the specified Array of column names from being treated
+        #                         as low-card columns; this happens by default to created_at and
+        #                         updated_at. These columns will not be touched by the low-card
+        #                         code, meaning they have to be nullable or have defaults.
+        # [:]
+        def is_low_card_table(options = { })
+          self.low_card_options = options
+          _low_card_disable_save_when_needed!
+        end
+
         def _low_card_disable_save_when_needed!
           send(:define_method, :save_low_card_row!) do |*args|
             begin
