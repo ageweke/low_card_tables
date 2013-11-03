@@ -58,7 +58,7 @@ module LowCardTables
       def low_card_value_collapsing_update_scheme(new_scheme)
         if (! new_scheme)
           @collapsing_update_scheme
-        elsif new_scheme == :default
+        elsif new_scheme == :default || new_scheme == :none
           @collapsing_update_scheme = new_scheme
         elsif new_scheme.kind_of?(Integer)
           raise ArgumentError, "You must specify an integer >= 1, not #{new_scheme.inspect}" unless new_scheme >= 1

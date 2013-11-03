@@ -292,6 +292,89 @@ describe "LowCardTables migration support" do
     end
   end
 
+    it "should be able to collapse now-identical rows and return the collapse map using collapse_rows_and_update_referrers!" do
+      tn = @table_name
+      migrate do
+        drop_table tn rescue nil
+        create_table tn, :low_card => true do |t|
+          t.boolean :deleted, :null => false
+          t.boolean :deceased
+          t.string :gender, :null => false
+          t.integer :donation_level
+        end
+
+        drop_table :lctables_spec_users rescue nil
+        create_table :lctables_spec_users do |t|
+          t.string :name, :null => false
+          t.integer :user_status_id, :null => false, :limit => 2
+        end
+      end
+
+      define_model_class(:UserStatus, @table_name) { is_low_card_table }
+      define_model_class(:User, :lctables_spec_users) { has_low_card_table :status }
+
+      user1 = create_user!('User1', false, false, 'male', 5)
+      user2 = create_user!('User2', false, false, 'male', 10)
+      user3 = create_user!('User3', false, false, 'male', 7)
+      user4 = create_user!('User4', false, false, 'female', 5)
+      user5 = create_user!('User5', false, true, 'male', 5)
+
+      competing_ids = [ user1.user_status_id, user2.user_status_id, user3.user_status_id ]
+
+      # Make sure they all have unique status IDs
+      [ user1, user2, user3, user4, user5 ].map(&:user_status_id).uniq.length.should == 5
+
+      define_model_class(:UserStatusBackdoor, @table_name) { }
+      ::UserStatusBackdoor.count.should == 5
+
+      count_after_removal = nil
+      collapse_map = nil
+      count_after_collapse = nil
+
+      migrate do
+        change_low_card_table tn do
+          remove_column tn, :donation_level, :low_card_collapse_rows => false
+          count_after_removal = ::UserStatusBackdoor.count
+
+          collapse_map = ::UserStatus.low_card_collapse_rows_and_update_referrers!
+          count_after_collapse = ::UserStatusBackdoor.count
+        end
+      end
+
+      count_after_removal.should == 5
+      count_after_collapse.should == 3
+      collapse_map.size.should == 1
+
+      k = collapse_map.keys[0]
+      k.class.should == ::UserStatus
+      competing_ids.include?(k.id).should be
+
+      expected_losers = competing_ids - [ k.id ]
+      actual_losers = collapse_map[k].map(&:id)
+      actual_losers.sort.should == expected_losers.sort
+
+      ::UserStatusBackdoor.reset_column_information
+      ::UserStatusBackdoor.count.should == 3
+
+      user123_status = ::UserStatusBackdoor.find(user1.user_status_id)
+      user123_status.deleted.should == false
+      user123_status.deceased.should == false
+      user123_status.gender.should == 'male'
+
+      user4_status = ::UserStatusBackdoor.find(user4.user_status_id)
+      user4_status.deleted.should == false
+      user4_status.deceased.should == false
+      user4_status.gender.should == 'female'
+
+      user5_status = ::UserStatusBackdoor.find(user5.user_status_id)
+      user5_status.deleted.should == false
+      user5_status.deceased.should == true
+      user5_status.gender.should == 'male'
+
+      [ ::User.find(user1.id), ::User.find(user2.id), ::User.find(user3.id) ].map(&:user_status_id).uniq.length.should == 1 # all the same
+      [ ::User.find(user1.id), ::User.find(user4.id), ::User.find(user5.id) ].map(&:user_status_id).uniq.length.should == 3 # all different
+    end
+
   %w{remove_column change_table}.each do |remove_column_type|
     before :each do
       @remove_column_proc = if remove_column_type == 'remove_column'
@@ -394,6 +477,12 @@ describe "LowCardTables migration support" do
             t.string :name, :null => false
             t.integer :admin_status_id, :null => false, :limit => 2
           end
+
+          drop_table :lctables_spec_guests rescue nil
+          create_table :lctables_spec_guests do |t|
+            t.string :name, :null => false
+            t.integer :guest_status_id, :null => false, :limit => 2
+          end
         end
 
         define_model_class(:UserStatus, @table_name) { is_low_card_table }
@@ -402,6 +491,7 @@ describe "LowCardTables migration support" do
           has_low_card_table :other_status, :class => ::UserStatus, :foreign_key => :other_status_id
         end
         define_model_class(:Admin, :lctables_spec_admins) { has_low_card_table :status, :class => ::UserStatus, :foreign_key => :admin_status_id }
+        define_model_class(:Guest, :lctables_spec_guests) { has_low_card_table :status, :class => ::UserStatus, :foreign_key => :guest_status_id }
 
         ::User.low_card_value_collapsing_update_scheme 10
 
@@ -425,6 +515,10 @@ describe "LowCardTables migration support" do
         end
 
         ::Admin.reset_low_card_calls!
+
+        class ::Guest
+          low_card_value_collapsing_update_scheme :none
+        end
 
         @all_users = [ ]
         50.times do
@@ -461,6 +555,22 @@ describe "LowCardTables migration support" do
           new_admin.save!
 
           @all_admins << new_admin
+        end
+
+        @all_guests = [ ]
+        5.times do
+          new_guest = Guest.new
+
+          new_guest.name = "Guest#{rand(1_000_000_000)}"
+
+          new_guest.deleted = !! (rand(2) == 0)
+          new_guest.deceased = !! (rand(2) == 0)
+          new_guest.gender = case rand(3); when 0 then 'female'; when 1 then 'male'; when 2 then 'other'; end
+          new_guest.donation_level = rand(10)
+
+          new_guest.save!
+
+          @all_guests << new_guest
         end
 
         define_model_class(:UserStatusBackdoor, @table_name) { }
@@ -505,6 +615,11 @@ describe "LowCardTables migration support" do
           admin.admin_status_id.should == previous_admin.admin_status_id
         end
 
+        ::Guest.all.each do |guest|
+          previous_guest = @all_guests.detect { |u| u.id == guest.id }
+          guest.guest_status_id.should == previous_guest.guest_status_id
+        end
+
         admin_change_maps = ::Admin.low_card_calls
         admin_change_maps.length.should == 0
       end
@@ -528,6 +643,11 @@ describe "LowCardTables migration support" do
         ::Admin.all.each do |admin|
           previous_admin = @all_admins.detect { |u| u.id == admin.id }
           admin.admin_status_id.should == previous_admin.admin_status_id
+        end
+
+        ::Guest.all.each do |guest|
+          previous_guest = @all_guests.detect { |u| u.id == guest.id }
+          guest.guest_status_id.should == previous_guest.guest_status_id
         end
 
         admin_change_maps = ::Admin.low_card_calls
@@ -586,6 +706,11 @@ describe "LowCardTables migration support" do
 
         user_updates = @collector.updates.select { |u| u =~ /lctables_spec_users/ }
         user_updates.length.should == expected_update_count
+
+        ::Guest.all.each do |guest|
+          previous_guest = @all_guests.detect { |u| u.id == guest.id }
+          guest.guest_status_id.should == previous_guest.guest_status_id
+        end
       end
     end
   end
