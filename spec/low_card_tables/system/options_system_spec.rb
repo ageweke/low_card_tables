@@ -67,6 +67,67 @@ describe "LowCardTables association options" do
     ::UserStatusExcludeColumnNames.first.donation_level.should == 35
   end
 
+  it "should exclude :created_at and :updated_at by default, but use them" do
+    migrate do
+      drop_table :lctables_spec_user_statuses rescue nil
+      create_table :lctables_spec_user_statuses do |t|
+        t.boolean :deleted, :null => false
+        t.boolean :deceased
+        t.string :gender, :null => false
+
+        t.timestamps
+      end
+
+      add_index :lctables_spec_user_statuses, [ :deleted, :deceased, :gender ], :unique => true, :name => 'index_lctables_spec_user_statuses_on_all'
+
+      drop_table :lctables_spec_users rescue nil
+      create_table :lctables_spec_users do |t|
+        t.string :name, :null => false
+        t.integer :user_status_id, :null => false, :limit => 2
+      end
+    end
+
+    define_model_class(:UserStatusExcludeCreatedUpdated, :lctables_spec_user_statuses) do
+      is_low_card_table :exclude_column_names => [ :donation_level ]
+    end
+
+    define_model_class(:UserExcludeCreatedUpdated, :lctables_spec_users) do
+      has_low_card_table :status, :class => :UserStatusExcludeCreatedUpdated, :foreign_key => :user_status_id
+    end
+
+    ::UserStatusExcludeCreatedUpdated.count.should == 0
+
+    user1 = ::UserExcludeCreatedUpdated.new
+    user1.name = 'User1'
+    user1.deleted = false
+    user1.deceased = false
+    user1.gender = 'female'
+
+    start_time = Time.now.to_i
+    user1.save!
+    end_time = Time.now.to_i
+
+    ::UserStatusExcludeCreatedUpdated.count.should == 1
+    ::UserStatusExcludeCreatedUpdated.first.created_at.to_i.should >= start_time
+    ::UserStatusExcludeCreatedUpdated.first.created_at.to_i.should <= end_time
+    ::UserStatusExcludeCreatedUpdated.first.updated_at.to_i.should >= start_time
+    ::UserStatusExcludeCreatedUpdated.first.updated_at.to_i.should <= end_time
+
+    user2 = ::UserExcludeCreatedUpdated.new
+    user2.name = 'User2'
+    user2.deleted = false
+    user2.deceased = false
+    user2.gender = 'female'
+
+    user2.save!
+
+    user1.user_status_id.should == user2.user_status_id
+    ::UserStatusExcludeCreatedUpdated.count.should == 1
+    ::UserStatusExcludeCreatedUpdated.first.created_at.to_i.should >= start_time
+    ::UserStatusExcludeCreatedUpdated.first.created_at.to_i.should <= end_time
+    ::UserStatusExcludeCreatedUpdated.first.updated_at.to_i.should >= start_time
+    ::UserStatusExcludeCreatedUpdated.first.updated_at.to_i.should <= end_time
+  end
   context "with standard setup" do
     before :each do
       create_standard_system_spec_tables!
