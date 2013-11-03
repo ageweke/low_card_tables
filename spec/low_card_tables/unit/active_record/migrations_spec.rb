@@ -11,12 +11,12 @@ describe LowCardTables::ActiveRecord::Migrations do
     %w{create_table add_column remove_column change_table}.each do |method_name|
       class_eval %{
   def #{method_name}(*args, &block)
-    record_call(:#{method_name}, args, block)
+    record_call(:#{method_name}, args, &block)
   end}
     end
 
     private
-    def record_call(name, *args, &block)
+    def record_call(name, args, &block)
       @calls << { :name => name, :args => args, :block => block }
     end
 
@@ -27,11 +27,11 @@ describe LowCardTables::ActiveRecord::Migrations do
     @migration = MockMigrationClass.new
   end
 
-  it "should add a unique index on :create_table" do
+  it "should pass through correctly for :create_table" do
     opts = Hash.new
     proc = lambda { }
 
     @migration.create_table(:foo, opts, &proc)
-    @migration.create_table_calls.length.should == 1
+    @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { } ], :block => proc } ]
   end
 end
