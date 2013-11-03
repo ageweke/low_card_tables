@@ -127,7 +127,7 @@ module LowCardTables
       end
 
       def raise_too_many_rows_error
-        raise %{We tried to read in all the rows for low-card table '#{@model_class.table_name}', but there were
+        raise LowCardTables::Errors::LowCardTooManyRowsError, %{We tried to read in all the rows for low-card table '#{@model_class.table_name}', but there were
 more rows that we are willing to handle -- there are at least #{max_row_count + 1}.
 Most likely, something has gone horribly wrong with your low-card table (such as you
 starting to store data that is not, in fact, low-cardinality at all). Alternatively,

@@ -142,6 +142,27 @@ describe "LowCardTables basic operations" do
 
       ::UserStatusBackdoor.count.should == 2
     end
+
+
+    it "should blow up if there are too many rows in the low-card table" do
+      class ::UserStatus
+        is_low_card_table :max_row_count => 10
+      end
+
+      15.times do |i|
+        bd = ::UserStatusBackdoor.new
+        bd.deleted = false
+        bd.deceased = false
+        bd.gender = 'female'
+        bd.donation_level = i + 10
+        bd.save!
+      end
+
+      lambda do
+        ::UserStatus.low_card_flush_cache!
+        ::UserStatus.low_card_all_rows
+      end.should raise_error(LowCardTables::Errors::LowCardTooManyRowsError, /11/)
+    end
   end
 
   it "should handle column default values in exactly the same way as ActiveRecord" do
