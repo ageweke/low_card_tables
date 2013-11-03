@@ -10,7 +10,6 @@ module LowCardTables
     # and see if it's a low-card table or not.
     module Base
       extend ActiveSupport::Concern
-      include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
 
       module ClassMethods
         # Declares that this is a low-card table. This simply includes the LowCardTables::LowCardTable::Base
@@ -25,10 +24,16 @@ module LowCardTables
           is_low_card_table(options)
         end
 
+        # Is this a low-card table? This implementation just returns false -- if this is a low-card table,
+        # then it will have had the LowCardTables::LowCardTable::Base module included in after this one, and
+        # that implementation will return true.
         def is_low_card_table?
           false
         end
 
+        # Declares that this table references a low-card table. This simply includes the
+        # LowCardTables::HasLowCardTable::Base method, and then calls that module's has_low_card_table method,
+        # which is the one that does all the real work.
         def has_low_card_table(*args)
           unless @_low_card_has_low_card_table_included
             include LowCardTables::HasLowCardTable::Base
@@ -38,6 +43,7 @@ module LowCardTables
           has_low_card_table(*args)
         end
 
+        # Does this model reference any low-card tables?
         def has_any_low_card_tables?
           false
         end
