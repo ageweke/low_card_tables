@@ -16,14 +16,17 @@ module LowCardTables
         @association_name = association_name.to_s
         @options = options.with_indifferent_access
 
-        # call a few methods that will raise errors if things are configured incorrectly;
-        # we call them here so that you get those errors immediately, at startup, instead of
-        # at some undetermined later point
+        # We call this here so that if things are configured incorrectly, you'll get an exception at the moment you
+        # try to associate the tables, rather than at runtime when you try to actually use them. Blowing up early is
+        # good. :)
         foreign_key_column_name
 
         low_card_class._low_card_referred_to_by(model_class)
       end
 
+      # Returns a Hash that maps the names of methods that should be added to the referring class to the names of
+      # methods they should invoke on the low-card class. This takes into account both the +:delegate+ option (via
+      # its internal call to #delegated_method_names) and the +:prefix+ option.
       def class_method_name_to_low_card_method_name_map
         return { } if options.has_key?(:delegate) && (! options[:delegate])
 
@@ -48,17 +51,19 @@ module LowCardTables
         low_card_class.low_card_ids_matching(query_constraints)
       end
 
+      # Returns an Array of names of methods on the low-card table that should be delegated to. This may be different
+      # than the names of methods on the referring class, because of the :prefix option.
       def delegated_method_names
         value_column_names = low_card_class._low_card_value_column_names.map(&:to_s)
 
         if options.has_key?(:delegate) && (! options[:delegate])
           [ ]
-        elsif options[:delegate].kind_of?(Array)
-          out = options[:delegate].map(&:to_s)
+        elsif options[:delegate].kind_of?(Array) || options[:delegate].kind_of?(String) || options[:delegate].kind_of?(Symbol)
+          out = Array(options[:delegate]).map(&:to_s)
           extra = out - value_column_names
 
           if extra.length > 0
-            raise ArgumentError, "You told us to delegate the following methods to low-card class #{low_card_class}, but that model doesn't have these columns: #{extra.join(", ")}; it has these columns: #{low_card_class._low_card_value_column_names.join(", ")}"
+            raise ArgumentError, "You told us to delegate the following methods to low-card class #{low_card_class}, but that model doesn't have these columns: #{extra.join(", ")}; it has these columns: #{value_column_names.join(", ")}"
           end
           out
         elsif options[:delegate] && options[:delegate].kind_of?(Hash) && options[:delegate].keys.map(&:to_s) == %w{except}
@@ -66,12 +71,14 @@ module LowCardTables
           extra = excluded - value_column_names
 
           if extra.length > 0
-            raise ArgumentError, "You told us to delegate all but the following methods to low-card class #{low_card_class}, but that model doesn't have these columns: #{extra.join(", ")}; it has these columns: #{low_card_class._low_card_value_column_names.join(", ")}"
+            raise ArgumentError, "You told us to delegate all but the following methods to low-card class #{low_card_class}, but that model doesn't have these columns: #{extra.join(", ")}; it has these columns: #{value_column_names.join(", ")}"
           end
 
           value_column_names - excluded
+        elsif (! options.has_key?(:delegate)) || options[:delegate] == true
+          value_column_names
         else
-          low_card_class._low_card_value_column_names
+          raise ArgumentError, "Invalid value for :delegate: #{options[:delegate].inspect}"
         end
       end
 
