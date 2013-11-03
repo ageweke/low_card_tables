@@ -51,14 +51,14 @@ describe "LowCardTables query support" do
   end
 
   it "should allow 'where' clauses that use delegated properties with differently-prefixed names directly" do
-    define_model_class(:User2, :lctables_spec_users) { has_low_card_table :status, :prefix => :foo, :class => ::UserStatus }
+    define_model_class(:User2, :lctables_spec_users) { has_low_card_table :status, :prefix => :foo, :class => ::UserStatus, :foreign_key => :user_status_id }
 
     lambda { check_user_ids(::User2.where(:deleted => false), [ ]) }.should raise_error(::ActiveRecord::StatementInvalid)
     check_user_ids(::User2.where(:foo_deleted => false), [ @user1, @user3, @user4, @user5 ])
   end
 
   it "should not allow 'where' clauses that use non-delegated properties" do
-    define_model_class(:User3, :lctables_spec_users) { has_low_card_table :status, :delegate => [ :deceased ], :class => ::UserStatus }
+    define_model_class(:User3, :lctables_spec_users) { has_low_card_table :status, :delegate => [ :deceased ], :class => ::UserStatus, :foreign_key => :user_status_id }
 
     lambda { check_user_ids(::User3.where(:deleted => false), [ ]) }.should raise_error(::ActiveRecord::StatementInvalid)
   end

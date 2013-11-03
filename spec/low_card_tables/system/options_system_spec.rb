@@ -192,7 +192,7 @@ describe "LowCardTables association options" do
           super(x)
         end
 
-        has_low_card_table :status, :class => ::UserStatus
+        has_low_card_table :status, :class => ::UserStatus, :foreign_key => :user_status_id
       end
 
       user1 = ::UserTest.new
@@ -218,7 +218,7 @@ describe "LowCardTables association options" do
       end
 
       class UserTest1 < RandomSuperclass
-        has_low_card_table :status, :class => ::UserStatus
+        has_low_card_table :status, :class => ::UserStatus, :foreign_key => :user_status_id
       end
 
       user1 = ::UserTest1.new
@@ -255,7 +255,7 @@ describe "LowCardTables association options" do
         include RandomModule
 
         self.table_name = :lctables_spec_users
-        has_low_card_table :status, :class => ::UserStatus
+        has_low_card_table :status, :class => ::UserStatus, :foreign_key => :user_status_id
       end
 
       user1 = ::UserTest2.new
@@ -290,7 +290,7 @@ describe "LowCardTables association options" do
 
       class UserTest3 < ::ActiveRecord::Base
         self.table_name = :lctables_spec_users
-        has_low_card_table :status, :class => ::UserStatus
+        has_low_card_table :status, :class => ::UserStatus, :foreign_key => :user_status_id
 
         include RandomModule
       end
