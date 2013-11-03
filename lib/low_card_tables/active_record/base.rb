@@ -5,6 +5,9 @@ require 'low_card_tables/has_low_card_table/base'
 
 module LowCardTables
   module ActiveRecord
+    # This is a module that gets included into ActiveRecord::Base. It provides just the bootstrap
+    # for LowCardTables: methods that let you declare #is_low_card_table or #has_low_card_table,
+    # and see if it's a low-card table or not.
     module Base
       extend ActiveSupport::Concern
       include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
@@ -30,7 +33,7 @@ module LowCardTables
         end
 
         def has_any_low_card_tables?
-          @_low_card_has_low_card_table_included
+          false
         end
 
         def _low_card_disable_save_when_needed!

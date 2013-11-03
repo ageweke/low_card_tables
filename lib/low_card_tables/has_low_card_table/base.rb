@@ -11,6 +11,10 @@ module LowCardTables
       module ClassMethods
         delegate :has_low_card_table, :to => :_low_card_associations_manager
 
+        def has_any_low_card_tables?
+          true
+        end
+
         def _low_card_associations_manager
           @_low_card_associations_manager ||= LowCardTables::HasLowCardTable::LowCardAssociationsManager.new(self)
         end
