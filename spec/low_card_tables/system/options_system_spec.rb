@@ -87,9 +87,7 @@ describe "LowCardTables association options" do
       end
     end
 
-    define_model_class(:UserStatusExcludeCreatedUpdated, :lctables_spec_user_statuses) do
-      is_low_card_table :exclude_column_names => [ :donation_level ]
-    end
+    define_model_class(:UserStatusExcludeCreatedUpdated, :lctables_spec_user_statuses) { is_low_card_table }
 
     define_model_class(:UserExcludeCreatedUpdated, :lctables_spec_users) do
       has_low_card_table :status, :class => :UserStatusExcludeCreatedUpdated, :foreign_key => :user_status_id

@@ -35,6 +35,16 @@ describe "LowCardTables basic operations" do
       ::UserStatus.low_card_options.should == { }
     end
 
+    it "should blow up if you say #has_low_card_table for something that isn't" do
+      define_model_class(:UserStatusReferencingError, :lctables_spec_user_statuses) { }
+
+      lambda do
+        define_model_class(:UserReferencingError, :lctables_spec_users) do
+          has_low_card_table :status, :class => :UserStatusReferencingError, :foreign_key => :user_status_id
+        end
+      end.should raise_error(ArgumentError, /UserStatusReferencingError/i)
+    end
+
     it "should allow setting all options, and create an appropriate row" do
       @user1.should be
 
