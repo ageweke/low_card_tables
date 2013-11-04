@@ -126,7 +126,8 @@ The model class has these columns: #{model_class.columns.map(&:name).sort.join("
 
       # When a low-card table has a column removed, it will typically have duplicate rows; these duplicate rows are
       # then deleted. But then referring tables need to be updated. This method gets called at that point, with a map
-      # of <winner row> => <array of loser rows>, and the collapsing_update_scheme declared by
+      # of <winner row> => <array of loser rows>, and the +collapsing_update_scheme+ declared by this referring
+      # model class. It is responsible for handling whatever collapsing update scheme has been declared properly.
       def update_collapsed_rows(collapse_map, collapsing_update_scheme)
         if collapsing_update_scheme.respond_to?(:call)
           collapsing_update_scheme.call(collapse_map)

@@ -52,16 +52,20 @@ describe LowCardTables::HasLowCardTable::Base do
   end
 
   it "should create and maintain one low-card dynamic methods module" do
-    @spec_class.ancestors.detect { |a| a.name =~ /LowCardDynamicMethods/i }.should_not be
+    class HasLowCardTableBaseDynamicMethodsModuleTest
+      include LowCardTables::HasLowCardTable::Base
+    end
 
-    mod = @spec_class._low_card_dynamic_methods_module
+    HasLowCardTableBaseDynamicMethodsModuleTest.ancestors.detect { |a| a.name =~ /LowCardDynamicMethods/i }.should_not be
+
+    mod = HasLowCardTableBaseDynamicMethodsModuleTest._low_card_dynamic_methods_module
     mod.class.should == ::Module
-    @spec_class.ancestors.include?(mod).should be
-    @spec_class.ancestors.detect { |a| a.name =~ /LowCardDynamicMethods/i }.should_not be
+    HasLowCardTableBaseDynamicMethodsModuleTest.ancestors.include?(mod).should be
+    HasLowCardTableBaseDynamicMethodsModuleTest.ancestors.detect { |a| a.name =~ /LowCardDynamicMethods/i }.should be
 
-    @spec_class.const_get(:LowCardDynamicMethods).should be(mod)
+    HasLowCardTableBaseDynamicMethodsModuleTest.const_get(:LowCardDynamicMethods).should be(mod)
 
-    @spec_class._low_card_dynamic_methods_module.should be(mod)
+    HasLowCardTableBaseDynamicMethodsModuleTest._low_card_dynamic_methods_module.should be(mod)
   end
 
   it "should create and maintain one low-card objects manager" do

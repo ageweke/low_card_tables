@@ -88,7 +88,7 @@ module LowCardTables
         def _low_card_dynamic_methods_module
           @_low_card_dynamic_methods_module ||= begin
             out = Module.new
-            const_set(:LowCardDynamicMethods, out)
+            self.const_set(:LowCardDynamicMethods, out)
             include out
             out
           end
