@@ -50,6 +50,11 @@ describe "LowCardTables query support" do
     check_user_ids(::User.where(:deleted => false), [ @user1, @user3, @user4, @user5 ])
   end
 
+  it "should allow 'where' clauses that combine low-card and non-low-card properties" do
+    check_user_ids(::User.where(:deleted => false, :name => 'User1'), [ @user1 ])
+    check_user_ids(::User.where(:deleted => false, :name => 'User2'), [ ])
+  end
+
   it "should allow 'where' clauses that use delegated properties with differently-prefixed names directly" do
     define_model_class(:User2, :lctables_spec_users) { has_low_card_table :status, :prefix => :foo, :class => ::UserStatus, :foreign_key => :user_status_id }
 

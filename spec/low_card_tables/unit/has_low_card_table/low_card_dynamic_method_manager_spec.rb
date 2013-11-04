@@ -31,7 +31,58 @@ describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
       @manager.sync_methods!
     end
 
-    describe "method invocation" do
+    describe "#scope_from_query" do
+      before :each do
+        @base_scope = double("base_scope")
+        @end_scope = double("end_scope")
+      end
+
+      it "should pass through non-low-card constraints" do
+        expect(@base_scope).to receive(:where).once.with({ :name => 'bonk', :_low_card_direct => true }).and_return(@end_scope)
+        @manager.scope_from_query(@base_scope, { :name => 'bonk' }).should be(@end_scope)
+      end
+
+      it "should apply low-card constraints" do
+        low_card_class_1 = double("low_card_class_1")
+        allow(@association1).to receive(:low_card_class).and_return(low_card_class_1)
+        expect(low_card_class_1).to receive(:low_card_ids_matching).with({ 'lc1m1' => false }).and_return([ 3, 9, 12 ])
+
+        expect(@base_scope).to receive(:where).once.with("a1fk IN (:ids)", { :ids => [ 3, 9, 12 ] }).and_return(@end_scope)
+        @manager.scope_from_query(@base_scope, { :cm1 => false }).should be(@end_scope)
+      end
+
+      it "should apply multiple low-card constraints combined with non-low-card constraints" do
+        low_card_class_1 = double("low_card_class_1")
+        allow(@association1).to receive(:low_card_class).and_return(low_card_class_1)
+        expect(low_card_class_1).to receive(:low_card_ids_matching).with({ 'lc1m1' => false }).and_return([ 3, 9, 12 ])
+
+        low_card_class_2 = double("low_card_class_2")
+        allow(@association2).to receive(:low_card_class).and_return(low_card_class_2)
+        expect(low_card_class_2).to receive(:low_card_ids_matching).with({ 'lc2m2' => [ :a, :b ], 'lc2m1' => 'yohoho' }).and_return([ 4, 6, 8 ])
+
+        mid_scope = double("mid_scope")
+
+        expect(@base_scope).to receive(:where).once.with("a1fk IN (:ids)", { :ids => [ 3, 9, 12 ] }).and_return(mid_scope)
+        expect(mid_scope).to receive(:where).once.with("a2fk IN (:ids)", { :ids => [ 4, 6, 8 ] }).and_return(@end_scope)
+
+        @manager.scope_from_query(@base_scope, { :cm1 => false, :cm3 => [ :a, :b ], :bar => { 'lc2m1' => "yohoho" } }).should be(@end_scope)
+      end
+
+      it "should apply low-card constraints in combination with direct foreign-key constraints" do
+        low_card_class_1 = double("low_card_class_1")
+        allow(@association1).to receive(:low_card_class).and_return(low_card_class_1)
+        expect(low_card_class_1).to receive(:low_card_ids_matching).with({ 'lc1m1' => false }).and_return([ 3, 9, 12 ])
+
+        mid_scope = double("mid_scope")
+
+        expect(@base_scope).to receive(:where).once.with({ :a2fk => [ 1, 3, 12 ], :_low_card_direct => true }).and_return(mid_scope)
+        expect(mid_scope).to receive(:where).once.with("a1fk IN (:ids)", { :ids => [ 3, 9, 12 ] }).and_return(@end_scope)
+
+        @manager.scope_from_query(@base_scope, { :cm1 => false, :a2fk => [ 1, 3, 12] }).should be(@end_scope)
+      end
+    end
+
+    describe "method delegation and invocation" do
       before :each do
         @invoked_object = double("invoked_object")
         @low_card_object = double("low_card_object")

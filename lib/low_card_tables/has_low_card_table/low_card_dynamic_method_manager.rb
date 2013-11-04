@@ -53,16 +53,43 @@ module LowCardTables
         end
       end
 
+      # Given a base ::ActiveRecord::Relation scope (which can of course just be a model class itself), and a set of
+      # query constraints as passed into ::ActiveRecord::Relation#where (which must be a Hash -- for the other forms
+      # of #where, our override of ::ActiveRecord::Relation#where doesn't call this method but just passes through to
+      # the underlying method), returns a new scope that is the result of applying those constraints correctly to
+      # the +base_scope+.
+      #
+      # The constraints in the query_hash need not all be, or even any be, constraints on a low-card table; any non-
+      # low-card constraints are simply passed through verbatim. But constraints on a low-card table -- whether they're
+      # implicit, like
+      #
+      #    User.where(:deleted => false)
+      #
+      # or explicit, like
+      #
+      #    User.where(:status => { :deleted => false })
+      #
+      # ...are transformed into explicit references to the low-card foreign-key column:
+      #
+      #    User.where(:user_status_id => [ 1, 3, 4, 7, 8, 10 ])
       def scope_from_query(base_scope, query_hash)
-        final_constraints = { }
+        non_low_card_constraints = { }
         low_card_association_to_constraint_map = { }
 
+        # We iterate through the query hash, building up two hashes:
+        #
+        # * non_low_card_constraints is the set of all constraints that have nothing to do with a low-card table;
+        # * low_card_association_to_constraint_map maps low-card association names to a Hash of the constraints applied
+        #   to that association; the constraints in the Hash use key names that are the actual low-card column names
+        #   (i.e., we translate them from whatever delegated method names were present in the referring class)
         query_hash.each do |query_key, query_value|
           low_card_delegation = @method_delegation_map[query_key.to_s]
 
+          # Does this constraint even mention a low-card column or association name?
           if low_card_delegation
             (association, method) = low_card_delegation
 
+            # e.g., User.where(:status => { ... })
             if method == :_low_card_object
               if (! query_value.kind_of?(Hash))
                 raise ArgumentError, %{You are trying to constrain on #{@model_class.name}.#{query_key}, which is a low-card association,
@@ -73,19 +100,24 @@ yourself, using #{association.low_card_class.name}#ids_matching.}
 
               low_card_association_to_constraint_map[association] ||= { }
               low_card_association_to_constraint_map[association].merge!(query_value)
+            # e.g., User.where(:user_status_id => ...)
             elsif method == :_low_card_foreign_key
-              final_constraints[query_key] = query_value
+              non_low_card_constraints[query_key] = query_value
+            # e.g., User.where(:deleted => false)
             else
               low_card_association_to_constraint_map[association] ||= { }
               low_card_association_to_constraint_map[association][method] = query_value
             end
           else
-            final_constraints[query_key] = query_value
+            # e.g., User.where(:name => ...)
+            non_low_card_constraints[query_key] = query_value
           end
         end
 
         out = base_scope
-        out = base_scope.where(final_constraints.merge(:_low_card_direct => true)) if final_constraints.size > 0
+        # See the comment in LowCardTables::ActiveRecord::Relation -- this is so that when we call #where, below,
+        # we don't end up creating infinite mutual recursion. +_low_card_direct+ is our 'escape hatch'.
+        out = base_scope.where(non_low_card_constraints.merge(:_low_card_direct => true)) if non_low_card_constraints.size > 0
 
         # This is gross. In ActiveRecord v3, doing something like this:
         #
