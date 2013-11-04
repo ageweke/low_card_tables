@@ -32,7 +32,7 @@ module LowCardTables
 
         method_data = @method_delegation_map[method_name.to_s]
         unless method_data
-          raise "Whoa -- we're trying to call a delegated low-card method #{method_name.inspect} on #{object}, of class #{object.class}, but somehow the LowCardDynamicMethodManager has no knowledge of that method?!? We know about: #{@method_delegation_map.keys.sort.inspect}"
+          raise NameError, "Whoa -- we're trying to call a delegated low-card method #{method_name.inspect} on #{object}, of class #{object.class}, but somehow the LowCardDynamicMethodManager has no knowledge of that method?!? We know about: #{@method_delegation_map.keys.sort.inspect}"
         end
 
         (association, association_method_name) = method_data

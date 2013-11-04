@@ -45,7 +45,43 @@ describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
         expect(@invoked_object).to receive(association_name).and_return(@low_card_object)
         expect(@low_card_object).to receive(low_card_method_name).with(@args).and_return(@rv)
 
+        @methods_module.instance_methods.map(&:to_s).include?(method_name.to_s).should be
+
         @manager.run_low_card_method(@invoked_object, method_name, @args).should be(@rv)
+      end
+
+      context "after changing associations" do
+        before :each do
+          @manager.sync_methods!
+
+          @association3 = double("association3")
+          allow(@association3).to receive(:association_name).and_return("baz")
+          allow(@association3).to receive(:foreign_key_column_name).and_return("a3fk")
+          allow(@association3).to receive(:class_method_name_to_low_card_method_name_map).and_return({
+            'cm2' => 'lc3m1', 'cm4' => 'lc3m2' })
+
+          allow(@lcam).to receive(:associations).and_return([ @association1, @association3 ])
+
+          @manager.sync_methods!
+        end
+
+        it "should run the right method for cm1" do
+          check_invocation("cm1", "foo", "lc1m1")
+        end
+
+        it "should run the right method for cm2" do
+          check_invocation("cm2", "baz", "lc3m1")
+        end
+
+        it "should run the right method for cm3" do
+          @methods_module.instance_methods.map(&:to_s).include?("cm3").should_not be
+
+          lambda { @manager.run_low_card_method(@invoked_object, "cm3", @args) }.should raise_error(NameError, /cm3/)
+        end
+
+        it "should run the right method for cm4" do
+          check_invocation("cm4", "baz", "lc3m2")
+        end
       end
 
       it "should run the right method for cm1" do
@@ -65,6 +101,8 @@ describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
         expect(@invoked_object).to receive(:_low_card_objects_manager).and_return(lcom)
         expect(lcom).to receive(:object_for).with(association).and_return(@low_card_object)
 
+        @methods_module.instance_methods.map(&:to_s).include?(method_name).should be
+
         @manager.run_low_card_method(@invoked_object, method_name, [ ]).should be(@low_card_object)
       end
 
@@ -80,6 +118,8 @@ describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
         lcom = double("low_card_objects_manager")
         expect(@invoked_object).to receive(:_low_card_objects_manager).and_return(lcom)
         expect(lcom).to receive(:foreign_key_for).with(association).and_return(12345)
+
+        @methods_module.instance_methods.map(&:to_s).include?(method_name).should be
 
         @manager.run_low_card_method(@invoked_object, method_name, [ ]).should == 12345
       end
@@ -97,6 +137,8 @@ describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
         lcom = double("low_card_objects_manager")
         expect(@invoked_object).to receive(:_low_card_objects_manager).and_return(lcom)
         expect(lcom).to receive(:set_foreign_key_for).with(association, args)
+
+        @methods_module.instance_methods.map(&:to_s).include?(method_name).should be
 
         @manager.run_low_card_method(@invoked_object, method_name, args)
       end
