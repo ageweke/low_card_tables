@@ -37,6 +37,8 @@ describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
         @low_card_object = double("low_card_object")
         @args = double("args")
         @rv = double("rv")
+
+        allow(@invoked_object).to receive(:kind_of?).with(@model_class).and_return(true)
       end
 
       def check_invocation(method_name, association_name, low_card_method_name)
@@ -52,11 +54,73 @@ describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
 
       it "should run the right method for cm2" do
         check_invocation("cm2", "bar", "lc2m1")
-        # check_invocation("cm2", "foo", "lc1m2")
       end
 
       it "should run the right method for cm3" do
         check_invocation("cm3", "bar", "lc2m2")
+      end
+
+      def check_association(method_name, association)
+        lcom = double("low_card_objects_manager")
+        expect(@invoked_object).to receive(:_low_card_objects_manager).and_return(lcom)
+        expect(lcom).to receive(:object_for).with(association).and_return(@low_card_object)
+
+        @manager.run_low_card_method(@invoked_object, method_name, [ ]).should be(@low_card_object)
+      end
+
+      it "should return the right association for foo" do
+        check_association("foo", @association1)
+      end
+
+      it "should return the right association for bar" do
+        check_association("bar", @association2)
+      end
+
+      def check_foreign_key_get(method_name, association)
+        lcom = double("low_card_objects_manager")
+        expect(@invoked_object).to receive(:_low_card_objects_manager).and_return(lcom)
+        expect(lcom).to receive(:foreign_key_for).with(association).and_return(12345)
+
+        @manager.run_low_card_method(@invoked_object, method_name, [ ]).should == 12345
+      end
+
+      it "should return the right foreign key for a1fk" do
+        check_foreign_key_get("a1fk", @association1)
+      end
+
+      it "should return the right foreign key for a2fk" do
+        check_foreign_key_get("a2fk", @association2)
+      end
+
+      def check_foreign_key_set(method_name, association)
+        args = double("args")
+        lcom = double("low_card_objects_manager")
+        expect(@invoked_object).to receive(:_low_card_objects_manager).and_return(lcom)
+        expect(lcom).to receive(:set_foreign_key_for).with(association, args)
+
+        @manager.run_low_card_method(@invoked_object, method_name, args)
+      end
+
+      it "should set the right foreign key for a1fk" do
+        check_foreign_key_set("a1fk=", @association1)
+      end
+
+      it "should set the right foreign key for a2fk" do
+        check_foreign_key_set("a2fk=", @association2)
+      end
+
+      it "should blow up if asked to invoke a method that doesn't exist" do
+        lambda do
+          @manager.run_low_card_method(@invoked_object, "quux", [ ])
+        end.should raise_error(/quux/i)
+      end
+
+      it "should blow up if given an object of the wrong class" do
+        allow(@invoked_object).to receive(:kind_of?).with(@model_class).and_return(false)
+
+        lambda do
+          @manager.run_low_card_method(@invoked_object, "foo", [ ])
+        end.should raise_error(ArgumentError)
       end
     end
   end

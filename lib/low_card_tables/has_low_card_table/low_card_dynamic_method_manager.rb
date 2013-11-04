@@ -22,7 +22,14 @@ module LowCardTables
         @method_delegation_map = { }
       end
 
+      # Given an instance of the model class we're maintaining methods for, the name of a method to invoke, and
+      # arguments passed to that method, runs the correct method. This is therefore a dispatcher -- rather than attempt
+      # to define the methods on the _low_card_dynamic_methods_module at all times to directly call the right low-card
+      # object, we simply have them all call through here, instead, and do the dispatch at runtime. This simplifies
+      # the nature of the dynamic methods considerably.
       def run_low_card_method(object, method_name, args)
+        ensure_correct_class!(object)
+
         method_data = @method_delegation_map[method_name.to_s]
         unless method_data
           raise "Whoa -- we're trying to call a delegated low-card method #{method_name.inspect} on #{object}, of class #{object.class}, but somehow the LowCardDynamicMethodManager has no knowledge of that method?!? We know about: #{@method_delegation_map.keys.sort.inspect}"
@@ -31,12 +38,16 @@ module LowCardTables
         (association, association_method_name) = method_data
 
         if association_method_name == :_low_card_object
+          # e.g., my_user.status
           object._low_card_objects_manager.object_for(association)
         elsif association_method_name == :_low_card_foreign_key
+          # e.g., my_user.user_status_id
           object._low_card_objects_manager.foreign_key_for(association)
         elsif association_method_name == :_low_card_foreign_key=
+          # e.g., my_user.user_status_id =
           object._low_card_objects_manager.set_foreign_key_for(association, *args)
         else
+          # e.g., my_user.deleted =
           low_card_object = object.send(association.association_name)
           low_card_object.send(association_method_name, *args)
         end
@@ -104,6 +115,25 @@ yourself, using #{association.low_card_class.name}#ids_matching.}
         out
       end
 
+      # This method is responsible for doing two things:
+      #
+      # * Most importantly, it sets up @method_delegation_map. This maps the name of every dynamic method that can be
+      #   invoked on an instance of the model class to the low-card method that it should delegate to. (It calls
+      #   LowCardTables::HasLowCardTable::LowCardAssociation#class_method_name_to_low_card_method_name_map to figure
+      #   out what methods should be delegated for each association.) There are a few 'special' method names:
+      #   +:_low_card_object+ means 'return the associated low-card object itself' (e.g., my_user.status);
+      #   +:_low_card_foreign_key+ means 'return the associated low-card foreign key' (e.g., my_user.user_status_id);
+      #   +:_low_card_foreign_key=+ means 'set the associated low-card foreign key'.
+      # * Secondly, it makes sure that, for each of these methods, the _low_card_dynamic_methods_module has installed
+      #   a method that delegates to #run_low_card_method on this object -- and that no other methods are installed
+      #   on that module.
+      #
+      # This method implements the 'last association wins' policy, by simply going through the asssociations in
+      # order of definition and letting them overwrite previous associations' method names, if they collide.
+      #
+      # Rather than trying to dynamically add and remove methods as associations are added, columns are removed, etc.,
+      # it is _far_ simpler to do what we do here: simply rebuild the map from scratch on each call -- and then apply
+      # the differences to the _low_card_dynamic_methods_module.
       def sync_methods!
         currently_delegated_methods = @method_delegation_map.keys
 
@@ -125,14 +155,19 @@ yourself, using #{association.low_card_class.name}#ids_matching.}
       end
 
       private
+      # Returns all associations that should be used for this object.
       def associations
         @model_class._low_card_associations_manager.associations
       end
 
-      def assocation(name)
-        @model_class._low_card_associations_manager.maybe_low_card_association(name)
+      # Makes sure the given object is an instance of the class we're handling dynamic methods for.
+      def ensure_correct_class!(object)
+        unless object.kind_of?(@model_class)
+          raise ArgumentError, "You passed #{object.inspect}, an instance of #{object.class.name}, to the LowCardDynamicMethodManager for #{@model_class}."
+        end
       end
 
+      # Removes all methods with any of the specified names from the _low_card_dynamic_methods_module.
       def remove_delegated_methods!(method_names)
         mod = @model_class._low_card_dynamic_methods_module
 
@@ -141,6 +176,7 @@ yourself, using #{association.low_card_class.name}#ids_matching.}
         end
       end
 
+      # Adds delegated methods for all the given names to the _low_card_dynamic_methods_module.
       def add_delegated_methods!(method_names)
         mod = @model_class._low_card_dynamic_methods_module
 
