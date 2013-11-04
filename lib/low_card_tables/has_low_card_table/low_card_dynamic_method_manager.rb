@@ -1,5 +1,21 @@
 module LowCardTables
   module HasLowCardTable
+    # This object is responsible for maintaining the set of methods that get automatically delegated when you declare
+    # +has_low_card_table+ on an ::ActiveRecord model -- it both maintains the set of methods defined on the
+    # _low_card_dynamic_methods_module for that class, and directs the calls in the right place at runtime.
+    #
+    # Secondarily, it also is responsible for transforming query specifications -- #scope_from_query takes the set of
+    # constraints you passed, as a Hash, to ::ActiveRecord::Relation#where, and transforms them using low-card
+    # information. So:
+    #
+    #    { :deleted => true, :deceased => false }
+    #
+    # might become
+    #
+    #    { :user_status_id => [ 1, 3, 9, 17 ] }
+    #
+    # While it might seem odd for that functionality to live in this class, it actually makes sense; this is the
+    # class that knows what method names in the low-card class those keys map to, after all.
     class LowCardDynamicMethodManager
       def initialize(model_class)
         @model_class = model_class
@@ -100,7 +116,7 @@ yourself, using #{association.low_card_class.name}#ids_matching.}
 
           association.class_method_name_to_low_card_method_name_map.each do |desired_name, association_method_name|
             desired_name = desired_name.to_s
-            @method_delegation_map[desired_name] ||= [ association, association_method_name ]
+            @method_delegation_map[desired_name] = [ association, association_method_name ]
           end
         end
 

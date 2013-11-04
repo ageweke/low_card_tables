@@ -136,7 +136,7 @@ describe "LowCardTables association options" do
       drop_standard_system_spec_tables!
     end
 
-    it "should allow multiple references from a table to the same low-card table, and method delegation should be from the first one added" do
+    it "should allow multiple references from a table to the same low-card table, and method delegation should be from the last one added" do
       migrate do
         add_column :lctables_spec_users, :old_user_status_id, :integer
       end
@@ -155,10 +155,10 @@ describe "LowCardTables association options" do
       user1.gender = 'female'
       user1.donation_level = 8
 
-      user1.old_status.deleted = true
-      user1.old_status.deceased = false
-      user1.old_status.gender = 'male'
-      user1.old_status.donation_level = 3
+      user1.status.deleted = true
+      user1.status.deceased = false
+      user1.status.gender = 'male'
+      user1.status.donation_level = 3
 
       user1.save!
 
@@ -169,15 +169,15 @@ describe "LowCardTables association options" do
       user1_again.user_status_id.should == user1.user_status_id
       user1_again.old_user_status_id.should == user1.old_user_status_id
 
-      user1_again.status.deleted.should == false
+      user1_again.status.deleted.should == true
       user1_again.status.deceased.should == false
-      user1_again.status.gender.should == 'female'
-      user1_again.status.donation_level.should == 8
+      user1_again.status.gender.should == 'male'
+      user1_again.status.donation_level.should == 3
 
-      user1_again.old_status.deleted.should == true
+      user1_again.old_status.deleted.should == false
       user1_again.old_status.deceased.should == false
-      user1_again.old_status.gender.should == 'male'
-      user1_again.old_status.donation_level.should == 3
+      user1_again.old_status.gender.should == 'female'
+      user1_again.old_status.donation_level.should == 8
     end
 
     it "should not blow away methods that are already there, in the class itself, but still allow calls to super" do
