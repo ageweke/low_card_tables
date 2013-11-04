@@ -34,9 +34,7 @@ module LowCardTables
       end
 
       def low_card_column_information_reset!(low_card_model)
-        @associations.each do |association|
-          association.low_card_column_information_reset! if association.low_card_class == low_card_model
-        end
+        @model_class._low_card_dynamic_method_manager.sync_methods!
       end
 
       def _low_card_association(name)
@@ -49,7 +47,7 @@ module LowCardTables
 
       def low_card_update_foreign_keys!(model_instance)
         @associations.each do |association|
-          association.update_value_before_save!(model_instance)
+          association.update_foreign_key!(model_instance)
         end
       end
 

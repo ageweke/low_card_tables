@@ -144,7 +144,10 @@ The model class has these columns: #{model_class.columns.map(&:name).sort.join("
         end
       end
 
-      def update_value_before_save!(model_instance)
+      # Updates the foreign key for this association on the given model instance. This is called by
+      # LowCardTables::HasLowCardTable::Base#low_card_update_foreign_keys!, which is primarily invoked by a
+      # +:before_save+ filter and alternatively can be invoked manually.
+      def update_foreign_key!(model_instance)
         hash = { }
 
         low_card_object = model_instance._low_card_objects_manager.object_for(self)
@@ -160,10 +163,14 @@ The model class has these columns: #{model_class.columns.map(&:name).sort.join("
         end
       end
 
-      def low_card_column_information_reset!
-        sync_installed_methods!
-      end
-
+      # Figures out what the low-card class this association should use is; this uses convention, with some overrides.
+      #
+      # By default, for a class User that <tt>has_low_card_table :status</tt>, it looks for a class UserStatus. This
+      # is intentionally different from Rails' normal conventions, where it would simply look for a class Status. This
+      # is because low-card tables are almost always unique to their owning table -- _i.e._, the case where multiple
+      # tables say +has_low_card_table+ to the same low-card table is very rare. (This is just because having multiple
+      # tables that have -- <em>and always will have</em> -- the same set of low-card attributes is also quite rare.)
+      # Hence, we use a little more default specificity in the naming.
       def low_card_class
         @low_card_class ||= begin
           # e.g., class User has_low_card_table :status => UserStatus
@@ -206,19 +213,35 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
       private
       attr_reader :options, :model_class
 
-      def sync_installed_methods!
-        model_class._low_card_dynamic_method_manager.sync_methods!
-      end
-
+      # This is the method that actually updates rows in the referring table when a column is removed from a low-card
+      # table (and hence IDs are collapsed). It's called repeatedly, in a loop, from #update_collapsed_rows. One call
+      # of this method updates one 'chunk' of rows, where the row-chunk size is whatever was specified by a call to
+      # LowCardTables::HasLowCardTable::Base#low_card_value_collapsing_update_scheme. When it's done, it either returns
+      # +nil+, if there are no more rows to update, or the ID of the next row that should be updated, if there are.
+      #
+      # +starting_id+ is the primary-key value that this chunk should start at. (We always update rows in ascending
+      # primary-key order, starting with the smallest primary key.) +row_chunk_size+ is the number of rows that should
+      # be updated. +collapse_map+ contains only objects of the low-card class, mapping 'winners' to arrays of 'losers'.
+      # (That is, we must update all rows containing any ID found in an array of values to the corresponding ID found
+      # in the key.)
+      #
+      # Note that this method goes out of its way to not have a common bug: if you simply update rows from
+      # +starting_id+ to <tt>starting_id + row_chunk_size</tt>, then large gaps in the ID space will destroy performance
+      # completely. Rather than ever doing math on the primary key, we just tell the database to order rows in primary-
+      # key order and do chunks of the appropriate size.
       def update_collapsed_rows_batch(starting_id, row_chunk_size, collapse_map)
         starting_at_starting_id = model_class.where("#{model_class.primary_key} >= :starting_id", :starting_id => starting_id)
 
+        # Databases will return no rows if asked for an offset past the end of the table.
         one_past_ending_row = starting_at_starting_id.order("#{model_class.primary_key} ASC").offset(row_chunk_size).first
         one_past_ending_id = one_past_ending_row.id if one_past_ending_row
 
         base_scope = starting_at_starting_id
-        base_scope = base_scope.where("#{model_class.primary_key} < :one_past_ending_id", :one_past_ending_id => one_past_ending_id) if one_past_ending_id
+        if one_past_ending_id
+          base_scope = base_scope.where("#{model_class.primary_key} < :one_past_ending_id", :one_past_ending_id => one_past_ending_id)
+        end
 
+        # Do a series of updates -- one per entry in the +collapse_map+.
         collapse_map.each do |collapse_to, collapse_from_array|
           conditional = base_scope.where([ "#{foreign_key_column_name} IN (:collapse_from)", { :collapse_from => collapse_from_array.map(&:id) } ])
           conditional.update_all([ "#{foreign_key_column_name} = :collapse_to", { :collapse_to => collapse_to.id } ])
@@ -227,14 +250,17 @@ Perhaps you need to declare 'is_low_card_table' on that class?}
         one_past_ending_id
       end
 
+      # Fetches the ID from the referring model, by simply grabbing the value of its foreign-key column.
       def get_id_from_model(model_instance)
         model_instance[foreign_key_column_name]
       end
 
+      # Sets the ID on the referring model, by setting the value of its foreign-key column.
       def set_id_on_model(model_instance, new_id)
         model_instance[foreign_key_column_name] = new_id
       end
 
+      # Ensures that the given +model_instance+ is an instance of the referring model class.
       def ensure_correct_class!(model_instance)
         unless model_instance.kind_of?(model_class)
           raise %{Whoa! The LowCardAssociation '#{association_name}' for class #{model_class} somehow

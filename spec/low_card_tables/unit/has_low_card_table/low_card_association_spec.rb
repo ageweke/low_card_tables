@@ -19,7 +19,7 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
     allow(ModelClassNameAscName).to receive(:is_low_card_table?).and_return(true)
   end
 
-  describe "instantiation" do
+  describe "instantiation, #foreign_key_column_name, #association_name, and #low_card_class" do
     context "with a referred-to class" do
       before :each do
         expect(ModelClassNameAscName).to receive(:_low_card_referred_to_by).once.with(@model_class)
@@ -252,6 +252,36 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
       # A unit test would just test some insanely specific and long combination of ActiveRecord calls, and it wouldn't
       # be a useful test anyway, since you're vastly more likely to make errors in figuring out what the DB needs --
       # and you'd just spec those errors as well.
+    end
+
+    describe "#update_foreign_key!" do
+      before :each do
+        @model_instance = double("model_instance")
+        lcom = double("low_card_objects_manager")
+        low_card_object = double("low_card_object")
+
+        expect(@model_instance).to receive(:_low_card_objects_manager).and_return(lcom)
+        expect(lcom).to receive(:object_for).with(@association).and_return(low_card_object)
+
+        expect(ModelClassNameAscName).to receive(:_low_card_value_column_names).and_return(%w{foo bar baz})
+        allow(low_card_object).to receive(:[]) { |name| "foo#{name}" }
+
+        expect(ModelClassNameAscName).to receive(:low_card_find_or_create_ids_for).with({
+          'foo' => 'foofoo', 'bar' => 'foobar', 'baz' => 'foobaz' }).and_return(12345)
+      end
+
+      it "should change the ID when necessary" do
+        expect(@model_instance).to receive(:[]).with("model_class_name_asc_name_id").and_return(345)
+        expect(@model_instance).to receive(:[]=).with("model_class_name_asc_name_id", 12345)
+
+        @association.update_foreign_key!(@model_instance)
+      end
+
+      it "should not change the ID if it's not necessary" do
+        expect(@model_instance).to receive(:[]).with("model_class_name_asc_name_id").and_return(12345)
+
+        @association.update_foreign_key!(@model_instance)
+      end
     end
   end
 end
