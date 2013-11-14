@@ -153,6 +153,30 @@ describe "LowCardTables basic operations" do
       ::UserStatusBackdoor.count.should == 2
     end
 
+    it "should let you assign the low-card ID directly, and remap the associated object when that happens" do
+      previous_status_id = @user1.user_status_id
+
+      @user1.deleted = true
+      @user1.save!
+
+      new_status_id = @user1.user_status_id
+      new_status_id.should_not == previous_status_id
+
+      @user1.deceased = true
+
+      @user1.deleted.should == true
+      @user1.deceased.should == true
+
+      @user1.user_status_id = previous_status_id
+
+      @user1.user_status_id.should == previous_status_id
+      @user1.user_status_id.should_not == new_status_id
+
+      @user1.deleted.should == false
+      @user1.deceased.should == false
+      @user1.gender.should == 'female'
+      @user1.donation_level.should == 3
+    end
 
     it "should blow up if there are too many rows in the low-card table" do
       class ::UserStatus
