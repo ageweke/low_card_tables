@@ -168,21 +168,14 @@ on this object, and it will save, but make sure you understand ALL the implicati
           @_low_card_row_manager ||= LowCardTables::LowCardTable::RowManager.new(self)
         end
 
-        # Returns an array of names of columns that should be treated as value columns, for the purposes of the low-card
-        # system. This will typically be all columns on the model, except for the primary key (usually +id+) and special
-        # columns like +created_at+ and +updated_at+.
-        def _low_card_value_column_names
-          _low_card_row_manager.value_column_names
-        end
-
-        # Ensures that this table has the required unique index across all +_low_card_value_column_names+. If passed
+        # Ensures that this table has the required unique index across all +low_card_value_column_names+. If passed
         # a parameter that evaluates to true, it will create such an index, if there isn't one; otherwise, it will
         # simply raise an exception if there is no such index, and return without doing anything otherwise.
         def _low_card_ensure_has_unique_index!(create_if_needed = false)
           _low_card_row_manager.ensure_has_unique_index!(create_if_needed)
         end
 
-        # Removes any current unique index across all +_low_card_value_column_names+.
+        # Removes any current unique index across all +low_card_value_column_names+.
         def _low_card_remove_unique_index!
           _low_card_row_manager.remove_unique_index!
         end
@@ -199,7 +192,7 @@ on this object, and it will save, but make sure you understand ALL the implicati
         # them all with +low_card_+ in order to ensure that we can't possibly collide with methods provided by other
         # Gems or by client code, since many of the names are pretty generic (e.g., +all_rows+).
         [ :all_rows, :row_for_id, :rows_for_ids, :rows_matching, :ids_matching, :find_ids_for, :find_or_create_ids_for,
-          :find_rows_for, :find_or_create_rows_for, :flush_cache!, :referring_models,
+          :find_rows_for, :find_or_create_rows_for, :flush_cache!, :referring_models, :value_column_names,
           :collapse_rows_and_update_referrers!, :ensure_has_unique_index!, :remove_unique_index! ].each do |delegated_method_name|
           define_method("low_card_#{delegated_method_name}") do |*args|
             _low_card_row_manager.send(delegated_method_name, *args)

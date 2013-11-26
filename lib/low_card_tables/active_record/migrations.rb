@@ -155,10 +155,10 @@ module LowCardTables
           end
         end
 
-        # Gets a fresh set of _low_card_value_column_names from the given low-card model.
+        # Gets a fresh set of low_card_value_column_names from the given low-card model.
         def fresh_value_column_names(model)
           model.reset_column_information
-          model._low_card_value_column_names
+          model.low_card_value_column_names
         end
 
         # Splits an options Hash into two -- the first containing everything but low-card-related options, the second

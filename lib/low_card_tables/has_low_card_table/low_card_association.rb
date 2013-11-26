@@ -50,7 +50,7 @@ module LowCardTables
       # Returns an Array of names of methods on the low-card table that should be delegated to. This may be different
       # than the names of methods on the referring class, because of the :prefix option.
       def delegated_method_names
-        value_column_names = low_card_class._low_card_value_column_names.map(&:to_s)
+        value_column_names = low_card_class.low_card_value_column_names.map(&:to_s)
 
         if options.has_key?(:delegate) && (! options[:delegate])
           [ ]
@@ -152,7 +152,7 @@ The model class has these columns: #{model_class.columns.map(&:name).sort.join("
 
         low_card_object = model_instance._low_card_objects_manager.object_for(self)
 
-        low_card_class._low_card_value_column_names.each do |value_column_name|
+        low_card_class.low_card_value_column_names.each do |value_column_name|
           hash[value_column_name] = low_card_object[value_column_name]
         end
 

@@ -122,7 +122,7 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
   describe "#delegated_method_names" do
     def check_delegated_method_names(options, expected_results)
       expect(ModelClassNameAscName).to receive(:_low_card_referred_to_by).once.with(@model_class)
-      expect(ModelClassNameAscName).to receive(:_low_card_value_column_names).and_return(%w{foo bar baz})
+      expect(ModelClassNameAscName).to receive(:low_card_value_column_names).and_return(%w{foo bar baz})
       association = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :asc_name, options)
       association.delegated_method_names.sort.should == expected_results.sort
     end
@@ -165,7 +165,7 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
   describe "#class_method_name_to_low_card_method_name_map" do
     def check_class_method_name_to_low_card_method_name_map(options, expected_results)
       expect(ModelClassNameAscName).to receive(:_low_card_referred_to_by).once.with(@model_class)
-      expect(ModelClassNameAscName).to receive(:_low_card_value_column_names).and_return(%w{foo bar baz})
+      expect(ModelClassNameAscName).to receive(:low_card_value_column_names).and_return(%w{foo bar baz})
       association = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :asc_name, options)
 
       association.class_method_name_to_low_card_method_name_map.should == expected_results
@@ -263,7 +263,7 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
         expect(@model_instance).to receive(:_low_card_objects_manager).and_return(lcom)
         expect(lcom).to receive(:object_for).with(@association).and_return(low_card_object)
 
-        expect(ModelClassNameAscName).to receive(:_low_card_value_column_names).and_return(%w{foo bar baz})
+        expect(ModelClassNameAscName).to receive(:low_card_value_column_names).and_return(%w{foo bar baz})
         allow(low_card_object).to receive(:[]) { |name| "foo#{name}" }
 
         expect(ModelClassNameAscName).to receive(:low_card_find_or_create_ids_for).with({
