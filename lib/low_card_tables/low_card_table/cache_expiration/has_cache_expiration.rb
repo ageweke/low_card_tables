@@ -25,7 +25,7 @@ module LowCardTables
                 LowCardTables::LowCardTable::CacheExpiration::UnlimitedCacheExpirationPolicy.new
               elsif type_or_number == :exponential
                 @_low_card_cache_expiration_return_value = [ :exponential, :options ]
-                LowCardTables::LowCardTable::CacheExpiration::ExponentialCacheExpirationPolicy.new(options)
+                LowCardTables::LowCardTable::CacheExpiration::ExponentialCacheExpirationPolicy.new(options.merge(:start_time => Time.now))
               else
                 raise ArgumentError, "Invalid cache expiration time argumnet '#{type_or_number.inspect}'; you must pass a number, :unlimited, or :exponential."
               end

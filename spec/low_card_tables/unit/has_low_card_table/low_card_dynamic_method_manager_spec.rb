@@ -62,10 +62,24 @@ describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
 
         mid_scope = double("mid_scope")
 
-        expect(@base_scope).to receive(:where).once.with("a1fk IN (:ids)", { :ids => [ 3, 9, 12 ] }).and_return(mid_scope)
-        expect(mid_scope).to receive(:where).once.with("a2fk IN (:ids)", { :ids => [ 4, 6, 8 ] }).and_return(@end_scope)
+        # expect(@base_scope).to receive(:where).once.with("a1fk IN (:ids)", { :ids => [ 3, 9, 12 ] }).and_return(mid_scope)
+        # expect(mid_scope).to receive(:where).once.with("a2fk IN (:ids)", { :ids => [ 4, 6, 8 ] }).and_return(@end_scope)
+
+        base_args = mid_args = nil
+
+        expect(@base_scope).to receive(:where).once { |*args| base_args = args; mid_scope }
+        expect(mid_scope).to receive(:where).once { |*args| mid_args = args; @end_scope }
 
         @manager.scope_from_query(@base_scope, { :cm1 => false, :cm3 => [ :a, :b ], :bar => { 'lc2m1' => "yohoho" } }).should be(@end_scope)
+
+        # Perfectly valid for this to happen in either order
+        if base_args[0] =~ /^a1fk/
+          base_args.should == [ 'a1fk IN (:ids)', { :ids => [ 3, 9, 12 ]}]
+          mid_args.should == [ 'a2fk IN (:ids)', { :ids => [ 4, 6, 8 ]}]
+        else
+          base_args.should == [ 'a2fk IN (:ids)', { :ids => [ 4, 6, 8 ]}]
+          mid_args.should == [ 'a1fk IN (:ids)', { :ids => [ 3, 9, 12 ]}]
+        end
       end
 
       it "should apply low-card constraints in combination with direct foreign-key constraints" do
