@@ -27,8 +27,8 @@ describe LowCardTables::ActiveRecord::Base do
     end
 
     context "#cache_expiration" do
-      it "should be nil by default" do
-        @ar_class.low_card_cache_expiration.should_not be
+      it "should be exponential by default" do
+        @ar_class.low_card_cache_expiration.should == :exponential
       end
     end
   end
