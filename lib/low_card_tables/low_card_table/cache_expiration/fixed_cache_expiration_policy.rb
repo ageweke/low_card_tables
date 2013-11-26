@@ -15,6 +15,8 @@ module LowCardTables
         def stale?(cache_time, current_time)
           (current_time - cache_time) >= @expiration_time
         end
+
+        attr_reader :expiration_time
       end
     end
   end

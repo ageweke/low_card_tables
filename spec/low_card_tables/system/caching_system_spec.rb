@@ -312,6 +312,12 @@ describe "LowCardTables caching" do
         end
       end
 
+      module LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration::ClassMethods
+        def low_card_current_time
+          LowCardTables::LowCardTable::RowManager.override_current_time || Time.now
+        end
+      end
+
       class LowCardTables::LowCardTable::Cache
         def current_time
           LowCardTables::LowCardTable::RowManager.override_current_time || Time.now
@@ -357,6 +363,25 @@ describe "LowCardTables caching" do
       else
         raise "Unknown cached_or_not: #{cached_or_not.inspect}"
       end
+    end
+
+    it "should inherit policies correctly" do
+      ::LowCardTables.low_card_cache_expiration 20
+
+      ::LowCardTables.low_card_cache_expiration.should == 20
+
+      klass = Class.new(::ActiveRecord::Base)
+      klass.class_eval { is_low_card_table }
+      klass.low_card_cache_expiration.should == 20
+
+      ::LowCardTables.low_card_cache_expiration :unlimited
+      klass.low_card_cache_expiration.should == :unlimited
+
+      klass.low_card_cache_expiration 40
+      klass.low_card_cache_expiration.should == 40
+
+      ::LowCardTables.low_card_cache_expiration 190
+      klass.low_card_cache_expiration.should == 40
     end
 
     it "should apply a fixed setting correctly" do

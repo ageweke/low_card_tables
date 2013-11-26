@@ -8,6 +8,10 @@ module LowCardTables
       extend ActiveSupport::Concern
       include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
 
+      included do
+        low_card_cache_policy_inherits_from ::LowCardTables
+      end
+
       def _low_card_row_matches_any_hash?(hashes)
         hashes.detect { |hash| _low_card_row_matches_hash?(hash) }
       end

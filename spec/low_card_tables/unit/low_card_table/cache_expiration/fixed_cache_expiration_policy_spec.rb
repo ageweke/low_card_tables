@@ -13,6 +13,8 @@ describe LowCardTables::LowCardTable::CacheExpiration::FixedCacheExpirationPolic
   it "should expire at that time" do
     i = klass.new(1.0)
 
+    i.expiration_time.should == 1.0
+
     the_time = Time.now - rand(100_000)
     i.stale?(the_time, the_time).should_not be
     i.stale?(the_time, the_time + 0.5).should_not be
