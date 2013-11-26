@@ -64,14 +64,14 @@ describe LowCardTables::ActiveRecord::Migrations do
         expect(temp_class).to receive(:is_low_card_table).once.with().ordered
         expect(temp_class).to receive(:reset_column_information).once.ordered
 
-        expect(temp_class).to receive(:_low_card_remove_unique_index!).once.ordered
+        expect(temp_class).to receive(:low_card_remove_unique_index!).once.ordered
 
         expect(temp_class).to receive(:reset_column_information).at_least(2).times.ordered
         expect(temp_class).to receive(:low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
 
         expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(temp_class)
 
-        expect(temp_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+        expect(temp_class).to receive(:low_card_ensure_has_unique_index!).once.with(true).ordered
 
         @migration.create_table(:foo, @opts, &@proc)
         @migration.calls.should == [ { :name => :create_table, :args => [ :foo, { } ], :block => @proc } ]
@@ -128,14 +128,14 @@ describe LowCardTables::ActiveRecord::Migrations do
           end
 
           it "should call #eager_load, pick up an AR descendant properly, and enforce the index" do
-            expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+            expect(@low_card_class).to receive(:low_card_remove_unique_index!).once.ordered
 
             expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
             expect(@low_card_class).to receive(:low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
 
             expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
 
-            expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+            expect(@low_card_class).to receive(:low_card_ensure_has_unique_index!).once.with(true).ordered
 
             @migration.send(@method, *@args, &@proc)
             @migration.calls.should == [ { :name => @method, :args => @args, :block => @proc } ]
@@ -144,7 +144,7 @@ describe LowCardTables::ActiveRecord::Migrations do
           it "should not reinstitute the index if :low_card_collapse_rows => true" do
             add_option(@args, :low_card_collapse_rows => false)
 
-            expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+            expect(@low_card_class).to receive(:low_card_remove_unique_index!).once.ordered
 
             expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
             expect(@low_card_class).to receive(:low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
@@ -160,7 +160,7 @@ describe LowCardTables::ActiveRecord::Migrations do
           it "should detect removed columns" do
             add_option(@args, :low_card_foo => :bar)
 
-            expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+            expect(@low_card_class).to receive(:low_card_remove_unique_index!).once.ordered
 
             expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
             expect(@low_card_class).to receive(:low_card_value_column_names).once.ordered.and_return([ 'x', 'y' ])
@@ -170,7 +170,7 @@ describe LowCardTables::ActiveRecord::Migrations do
             expect(@low_card_class).to receive(:low_card_value_column_names).once.ordered.and_return([ 'y' ])
             expect(@low_card_class).to receive(:low_card_collapse_rows_and_update_referrers!).once.ordered.with(:low_card_foo => :bar)
 
-            expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+            expect(@low_card_class).to receive(:low_card_ensure_has_unique_index!).once.with(true).ordered
 
             @migration.send(@method, *@args, &@proc)
             expected_args = remove_low_card_options(@args)
@@ -182,14 +182,14 @@ describe LowCardTables::ActiveRecord::Migrations do
       it "should not do anything twice if calls are nested" do
         @opts[:foo] = :bar
 
-        expect(@low_card_class).to receive(:_low_card_remove_unique_index!).once.ordered
+        expect(@low_card_class).to receive(:low_card_remove_unique_index!).once.ordered
 
         expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
         expect(@low_card_class).to receive(:low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
 
         expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
 
-        expect(@low_card_class).to receive(:_low_card_ensure_has_unique_index!).once.with(true).ordered
+        expect(@low_card_class).to receive(:low_card_ensure_has_unique_index!).once.with(true).ordered
 
         inner_opts = { :a => :b, :low_card_foo => :bar }
         @proc = lambda do |*args|

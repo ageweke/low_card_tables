@@ -93,7 +93,7 @@ module LowCardTables
       end
 
       def fill!
-        @model_class._low_card_ensure_has_unique_index!
+        @model_class.low_card_ensure_has_unique_index!
 
         raise "Cannot fill: we already have values!" if @rows_by_id
 

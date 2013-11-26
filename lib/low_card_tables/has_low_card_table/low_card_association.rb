@@ -21,7 +21,7 @@ module LowCardTables
         # good. :)
         foreign_key_column_name
 
-        low_card_class._low_card_referred_to_by(model_class)
+        low_card_class.low_card_referred_to_by(model_class)
       end
 
       # Returns a Hash that maps the names of methods that should be added to the referring class to the names of

@@ -22,7 +22,7 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
   describe "instantiation, #foreign_key_column_name, #association_name, and #low_card_class" do
     context "with a referred-to class" do
       before :each do
-        expect(ModelClassNameAscName).to receive(:_low_card_referred_to_by).once.with(@model_class)
+        expect(ModelClassNameAscName).to receive(:low_card_referred_to_by).once.with(@model_class)
       end
 
       it "should create a new, simple instance correctly, and tell the referred-to class" do
@@ -121,7 +121,7 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
 
   describe "#delegated_method_names" do
     def check_delegated_method_names(options, expected_results)
-      expect(ModelClassNameAscName).to receive(:_low_card_referred_to_by).once.with(@model_class)
+      expect(ModelClassNameAscName).to receive(:low_card_referred_to_by).once.with(@model_class)
       expect(ModelClassNameAscName).to receive(:low_card_value_column_names).and_return(%w{foo bar baz})
       association = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :asc_name, options)
       association.delegated_method_names.sort.should == expected_results.sort
@@ -164,7 +164,7 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
 
   describe "#class_method_name_to_low_card_method_name_map" do
     def check_class_method_name_to_low_card_method_name_map(options, expected_results)
-      expect(ModelClassNameAscName).to receive(:_low_card_referred_to_by).once.with(@model_class)
+      expect(ModelClassNameAscName).to receive(:low_card_referred_to_by).once.with(@model_class)
       expect(ModelClassNameAscName).to receive(:low_card_value_column_names).and_return(%w{foo bar baz})
       association = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :asc_name, options)
 
@@ -196,7 +196,7 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
 
   context "with a valid instance" do
     before :each do
-      expect(ModelClassNameAscName).to receive(:_low_card_referred_to_by).once.with(@model_class)
+      expect(ModelClassNameAscName).to receive(:low_card_referred_to_by).once.with(@model_class)
       @association = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :asc_name, { })
     end
 

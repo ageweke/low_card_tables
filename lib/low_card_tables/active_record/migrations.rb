@@ -146,11 +146,11 @@ module LowCardTables
         # a low-card table) beforehand, and recreates it afterwards.
         def without_unique_index(model, low_card_options, &block)
           begin
-            model._low_card_remove_unique_index!
+            model.low_card_remove_unique_index!
             block.call
           ensure
             unless low_card_options.has_key?(:low_card_collapse_rows) && (! low_card_options[:low_card_collapse_rows])
-              model._low_card_ensure_has_unique_index!(true)
+              model.low_card_ensure_has_unique_index!(true)
             end
           end
         end

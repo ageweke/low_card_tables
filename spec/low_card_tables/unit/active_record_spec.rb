@@ -18,18 +18,4 @@ describe LowCardTables::ActiveRecord::Base do
       @ar_class.is_low_card_table?.should be
     end
   end
-
-  context "as a low-card table" do
-    before :each do
-      @ar_class.class_eval do
-        is_low_card_table
-      end
-    end
-
-    context "#cache_expiration" do
-      it "should be exponential by default" do
-        @ar_class.low_card_cache_expiration.should == :exponential
-      end
-    end
-  end
 end
