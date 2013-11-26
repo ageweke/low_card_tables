@@ -128,6 +128,7 @@ describe LowCardTables::LowCardTable::Base do
 
       %w{all_rows row_for_id rows_for_ids rows_matching ids_matching find_ids_for find_or_create_ids_for
 find_rows_for find_or_create_rows_for flush_cache! referring_models collapse_rows_and_update_referrers!
+value_column_names referred_to_by
 ensure_has_unique_index! remove_unique_index!}.each do |method_name|
         it "should delegate to the row manager for #{method_name}" do
           expect(@rm).to receive(method_name).once.with(:foo, :bar).and_return(:baz)
