@@ -5,6 +5,8 @@ require 'low_card_tables/low_card_table/cache'
 module LowCardTables
   module LowCardTable
     class RowManager
+      attr_reader :low_card_model
+
       def initialize(low_card_model)
         unless low_card_model.respond_to?(:is_low_card_table?) && low_card_model.is_low_card_table?
           raise "You must supply a low-card AR model class, not: #{low_card_model.inspect}"

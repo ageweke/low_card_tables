@@ -4,26 +4,65 @@ require 'low_card_tables/low_card_table/row_manager'
 
 module LowCardTables
   module LowCardTable
+    # LowCardTables::LowCardTable::Base is the module that's included into any ActiveRecord model that you declare
+    # +is_low_card_table+ on. As such, it defines the API that's available on low-card tables. (The standard
+    # ActiveRecord API does, of course, still remain available, so you can also use that if you want.)
+    #
+    # Be careful of the distinction between the ClassMethods and instance methods here. ClassMethods are available on
+    # the low-card table as a whole; instance methods apply, of course, to each row individually.
     module Base
       extend ActiveSupport::Concern
+
+      # All low-card tables can have their cache-expiration policy set individually.
       include LowCardTables::LowCardTable::CacheExpiration::HasCacheExpiration
 
+      # Set up cache-policy inheritance -- see HasCacheExpiration for more details.
       included do
         low_card_cache_policy_inherits_from ::LowCardTables
       end
 
+      # This method is a critical entry point from the rest of the low-card system. For example, given our usual
+      # User/UserStatus example -- when you save a User object, the low-card system grabs the associated UserStatus
+      # object and creates a hash, mapping all of the columns in UserStatus to their corresponding values. Next, it
+      # iterates through its in-memory cache, using this method to determine which of the rows in the cache matches
+      # the hash it extracted -- and, when it finds one, that's the row it uses to get the low-card ID to assign
+      # in the associated table.
+      #
+      # *IMPORTANT*: this is not the _only_ context in which this method is used, but merely one example.
+      #
+      # It's possible to override this method to alter behavior; for example, you could use this to translate symbols
+      # to integers, pin values, or otherwise transform data. But be extremely careful when you do this, as you're
+      # playing with a very low-level part of the low-card system.
+      #
+      # Note that the hashes supplied can be partial or complete; that is, they may specify any subset of the values
+      # in this table, or all of them. This method must work accordingly -- if the hashes are partial, then, if this
+      # row's values for the keys that are specified match, then it should return true.
+      #
+      # This is the highest-level, most 'bulk' method -- it asks whether this row matches _any_ of the hashes in the
+      # supplied array.
       def _low_card_row_matches_any_hash?(hashes)
         hashes.detect { |hash| _low_card_row_matches_hash?(hash) }
       end
 
+      # This is called by #_low_card_row_matches_any_hash?, in a loop; it asks whether this row matches the hash
+      # provided. See #_low_card_row_matches_any_hash? for more details. You can override this method instead of that
+      # one, if its semantics work better for your purposes, since its behavior will affect that of
+      # #_low_card_row_matches_any_hash?.
       def _low_card_row_matches_hash?(hash)
         hash.keys.all? { |key| _low_card_column_matches?(key, hash[key]) }
       end
 
+      # This is called by _low_card_row_matches_hash?, in a loop; it asks whether the given column (+key+) matches
+      # the given value (+value+). See #_low_card_row_matches_any_hash? for more details. You can override this method
+      # instead of #_low_card_row_matches_any_hash? or #_low_card_row_matches_hash?, if its semantics work better for
+      # your purposes, since its behavior will affect those methods as well.
       def _low_card_column_matches?(key, value)
         self[key.to_s] == value
       end
 
+      # This method is called from methods like #low_card_rows_matching, when passed a block -- its job is simply to
+      # see if this row is matched by the given block. It's hard to imagine a different implementation than this one,
+      # but it's here in case you want to override it.
       def _low_card_row_matches_block?(block)
         block.call(self)
       end
@@ -38,17 +77,38 @@ module LowCardTables
         #                         as low-card columns; this happens by default to created_at and
         #                         updated_at. These columns will not be touched by the low-card
         #                         code, meaning they have to be nullable or have defaults.
-        # [:]
+        # [:max_row_count] The low-card system has a check built in to start raising errors if you
+        #                  appear to be storing data in a low-card table that is, in fact, not actually
+        #                  of low cardinality. The effect that doing this has is to explode the number
+        #                  of rows in the low-card table, so the check simply tests the total number
+        #                  of rows in the table. This defaults to 5,000
+        #                  (in LowCardTables::LowCardTable::Cache::DEFAULT_MAX_ROW_COUNT). If you really
+        #                  do have a valid low-card table with more than this number of rows, you can
+        #                  override that limit here.
         def is_low_card_table(options = { })
           self.low_card_options = options
           _low_card_disable_save_when_needed!
         end
 
+        # See LowCardTables::HasLowCardTable::LowCardObjectsManager for more details. In short, you should never be
+        # saving low-card objects directly; you should rather let the low-card Gem create such rows for you
+        # automatically, based on the attributes you assign to the model.
+        #
+        # This method is invoked only once, when #is_low_card_table is called.
         def _low_card_disable_save_when_needed!
           send(:define_method, :save_low_card_row!) do |*args|
             begin
               @_low_card_saves_allowed = true
               save!(*args)
+            ensure
+              @_low_card_saves_allowed = false
+            end
+          end
+
+          send(:define_method, :save_low_card_row) do |*args|
+            begin
+              @_low_card_saves_allowed = true
+              save(*args)
             ensure
               @_low_card_saves_allowed = false
             end
@@ -78,43 +138,66 @@ on this object, and it will save, but make sure you understand ALL the implicati
           end
         end
 
+        # Is this a low-card table? Since this module has been included into the class in question (which happens via
+        # #is_low_card_table), then the answer is always, 'yes'.
         def is_low_card_table?
           true
         end
 
+        # This is a method provided by ActiveRecord::Base. When the set of columns on a low-card table has changed, we
+        # need to tell the row manager, so that it can flush its caches.
         def reset_column_information
-          super
+          out = super
           _low_card_row_manager.column_information_reset!
+          out
         end
 
+        # This returns the set of low-card options specified for this class in #is_low_card_table.
         def low_card_options
           @_low_card_options ||= { }
         end
 
+        # This sets the set of low-card options.
         def low_card_options=(options)
           @_low_card_options = options
         end
 
+        # Returns the associated LowCardTables::LowCardTable::RowManager object for this class, which is where an awful
+        # lot of the real work happens.
         def _low_card_row_manager
           @_low_card_row_manager ||= LowCardTables::LowCardTable::RowManager.new(self)
         end
 
+        # Returns an array of names of columns that should be treated as value columns, for the purposes of the low-card
+        # system. This will typically be all columns on the model, except for the primary key (usually +id+) and special
+        # columns like +created_at+ and +updated_at+.
         def _low_card_value_column_names
           _low_card_row_manager.value_column_names
         end
 
+        # Ensures that this table has the required unique index across all +_low_card_value_column_names+. If passed
+        # a parameter that evaluates to true, it will create such an index, if there isn't one; otherwise, it will
+        # simply raise an exception if there is no such index, and return without doing anything otherwise.
         def _low_card_ensure_has_unique_index!(create_if_needed = false)
           _low_card_row_manager.ensure_has_unique_index!(create_if_needed)
         end
 
+        # Removes any current unique index across all +_low_card_value_column_names+.
         def _low_card_remove_unique_index!
           _low_card_row_manager.remove_unique_index!
         end
 
+        # Tells this model that it is referred to by the +referring_model_class+; this is called when another class
+        # says +has_low_card_table+ and refers to this one. We keep track of referrers primarily for the purpose of
+        # updating referring columns in the case where we remove a column from the low-card table (and hence any
+        # referring columns need to be updated, since we'll end up collapsing rows of the table).
         def _low_card_referred_to_by(referring_model_class)
           _low_card_row_manager.referred_to_by(referring_model_class)
         end
 
+        # All of these methods get delegated to the LowCardRowManager, which does most of the actual work. We prefix
+        # them all with +low_card_+ in order to ensure that we can't possibly collide with methods provided by other
+        # Gems or by client code, since many of the names are pretty generic (e.g., +all_rows+).
         [ :all_rows, :row_for_id, :rows_for_ids, :rows_matching, :ids_matching, :find_ids_for, :find_or_create_ids_for,
           :find_rows_for, :find_or_create_rows_for, :flush_cache!, :referring_models,
           :collapse_rows_and_update_referrers!, :ensure_has_unique_index!, :remove_unique_index! ].each do |delegated_method_name|

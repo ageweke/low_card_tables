@@ -1,6 +1,12 @@
 # low_card_tables
 
-Greatly improve scalability and maintainability of your database tables by breaking out columns containing few distinct values (e.g., booleans and other flags) into a separate table that's transparently referenced and used. Supports Rails 3.0.x, 3.1.x, 3.2.x, and 4.0.x, running on Ruby 1.8.7, 1.9.3, and 2.0.0 with MySQL, PostgreSQL, and Sqlite. (JRuby is supported, but only with MySQL, because `low_card_tables` depends on the `activerecord-import` gem, and it currently does not have JRuby support for anything but MySQL.) Adding support for other databases is trivial!
+Think of `low_card_tables` as "bitfields for ActiveRecord, but done right". It allows you to store multiple values
+as compactly as possible in a given database column, but using a technique that's vastly friendlier to queries,
+future expansion, separate analysis, and other (non-Rails) tools than actual bitfields. It works with any data that
+has few distinct values in the table; boolean fields are one example, but any `enum`-style fields are great candidates
+for use.
+
+Greatly improve scalability and maintainability of your database tables by breaking out columns containing few distinct values (e.g., booleans and other flags) into a separate table that's transparently referenced and used. Supports Rails 3.0.x, 3.1.x, 3.2.x, and 4.0.x, running on Ruby 1.8.7, 1.9.3, and 2.0.0 with MySQL, PostgreSQL, and Sqlite. (JRuby is supported, but only with MySQL, because `low_card_tables` depends on the `activerecord-import` gem, and it currently does not have JRuby support for anything but MySQL.) Adding support for other databases is trivial.
 
 `low_card_tables` is the successor to similar, but more primitive, systems that have been in place at very large commercial websites serving tens of millions of pages a day, and in database tables with hundreds of millions of rows. The predecessor systems were extremely successful and reliable &mdash; hence the desire to evolve this into an open-source gem.
 
