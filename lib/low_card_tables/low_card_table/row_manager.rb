@@ -269,7 +269,7 @@ We're looking for an index on the following columns:
         complete_hashes = input_to_complete_hash_map.values
 
         existing = rows_matching(complete_hashes)
-        still_not_found = complete_hashes - existing.keys
+        still_not_found = complete_hashes.reject { |h| existing[h].length > 0 }
 
         if still_not_found.length > 0 && do_create
           existing = flush_lock_and_create_rows_for!(complete_hashes)
@@ -360,7 +360,7 @@ The exception we got was:
           hashes = input_to_hashes_map.values
 
           existing = rows_matching(hashes)
-          still_not_found = hashes - existing.keys
+          still_not_found = hashes.reject { |h| existing[h].length > 0 }
 
           if still_not_found.length > 0
             keys = value_column_names
