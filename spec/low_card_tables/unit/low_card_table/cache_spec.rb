@@ -17,6 +17,24 @@ describe LowCardTables::LowCardTable::Cache do
 
   context "with an instance" do
     before :each do
+      klass.class_eval do
+        class << self
+          def override_time=(x)
+            @override_time = x
+          end
+
+          def override_time
+            out = @override_time
+            @override_time = nil
+            out
+          end
+        end
+
+        def current_time
+          self.class.override_time || Time.now
+        end
+      end
+
       @mc = double("model_class")
       allow(@mc).to receive(:is_low_card_table?).and_return(true)
       allow(@mc).to receive(:low_card_ensure_has_unique_index!)
@@ -39,7 +57,7 @@ describe LowCardTables::LowCardTable::Cache do
       expect(im2).to receive(:to_a).once.and_return([ @row1, @row2, @row3 ])
 
       @rows_read_at_time = double("rows_read_at_time")
-      expect(Time).to receive(:now).once.and_return(@rows_read_at_time)
+      klass.override_time = @rows_read_at_time
 
       @cache = klass.new(@mc)
     end
