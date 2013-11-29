@@ -1,9 +1,12 @@
 require 'active_support'
 require 'activerecord-import'
 require 'low_card_tables/low_card_table/cache'
+require 'low_card_tables/low_card_table/table_unique_index'
+require 'low_card_tables/low_card_table/row_collapser'
 
 module LowCardTables
   module LowCardTable
+    # In many ways, the RowManager is the beating heart of +low_card_tables+. Its job is to
     class RowManager
       attr_reader :low_card_model
 
@@ -13,6 +16,7 @@ module LowCardTables
         end
 
         @low_card_model = low_card_model
+        @table_unique_index = LowCardTables::LowCardTable::TableUniqueIndex.new(low_card_model)
         @referring_models = [ ]
       end
 
@@ -76,178 +80,38 @@ module LowCardTables
       end
 
       def collapse_rows_and_update_referrers!(low_card_options = { })
-        return if low_card_options.has_key?(:low_card_collapse_rows) && (! low_card_options[:low_card_collapse_rows])
-
-        additional_referring_models = low_card_options[:low_card_referrers]
-
-        attributes_to_rows_map = { }
-        @low_card_model.all.sort_by(&:id).each do |row|
-          attributes = value_attributes(row)
-
-          attributes_to_rows_map[attributes] ||= [ ]
-          attributes_to_rows_map[attributes] << row
-        end
-
-        collapse_map = { }
-        attributes_to_rows_map.each do |attributes, rows|
-          if rows.length > 1
-            winner = rows.shift
-            losers = rows
-
-            collapse_map[winner] = losers
-          end
-        end
-
-        ids_to_delete = collapse_map.values.map { |row_array| row_array.map(&:id) }.flatten
-        @low_card_model.delete_all([ "id IN (:ids)", { :ids => ids_to_delete } ])
-
-        all_referring_models = referring_models | (additional_referring_models || [ ])
-        transaction_models = all_referring_models + [ @low_card_model ]
-
-        unless low_card_options.has_key?(:low_card_update_referring_models) && (! low_card_options[:low_card_update_referring_models])
-          transactions_on(transaction_models) do
-            all_referring_models.each do |referring_model|
-              referring_model._low_card_update_collapsed_rows(@low_card_model, collapse_map)
-            end
-          end
-        end
+        collapser = LowCardTables::LowCardTable::RowCollapser.new(@low_card_model, low_card_options)
+        collapse_map = collapser.collapse!
 
         flush!(:collapse_rows_and_update_referrers)
-
         collapse_map
       end
 
       def ensure_has_unique_index!(create_if_needed = false)
-        return unless @low_card_model.table_exists?
-
-        current_name = current_unique_all_columns_index_name
-        return current_name if current_name
-
-        if create_if_needed
-          create_unique_index!
-        else
-          message = %{You said that the table '#{@low_card_model.table_name}' is a low-card table.
-However, it currently does not seem to have a unique index on all its columns. For the
-low-card system to work properly, this is *required* -- although the low-card system
-tries very hard to lock tables and otherwise ensure that it never will create duplicate
-rows, this is important enough that we really want the database to enforce it.
-
-We're looking for an index on the following columns:
-
-  #{value_column_names.sort.join(", ")}
-
-...and we have the following unique indexes:
-
-}
-          current_unique_indexes.each do |unique_index|
-            message << "  '#{unique_index.name}': #{unique_index.columns.sort.join(", ")}\n"
-          end
-          message << "\n"
-
-          raise LowCardTables::Errors::LowCardNoUniqueIndexError, message
-        end
+        @table_unique_index.ensure_present!(create_if_needed)
       end
 
       def remove_unique_index!
-        table_name = @low_card_model.table_name
-        current_name = current_unique_all_columns_index_name
-
-        if current_name
-          migrate do
-            remove_index table_name, :name => current_name
-          end
-
-          now_current_name = current_unique_all_columns_index_name
-          if now_current_name
-            raise "Whoa -- we tried to remove the unique index on #{table_name}, which was named '#{current_name}', but, after we removed it, we still have a unique all-columns index called '#{now_current_name}'!"
-          end
-        end
+        @table_unique_index.remove!
       end
+
 
       private
-      def transactions_on(transaction_models, &block)
-        if transaction_models.length == 0
-          block.call
-        else
-          model = transaction_models.shift
-          model.transaction { transactions_on(transaction_models, &block) }
-        end
-      end
-
-      def value_attributes(row)
-        attributes = row.attributes
-        out = { }
-        value_column_names.each { |n| out[n] = attributes[n] }
-        out
-      end
-
-      def migrate(&block)
-        migration_class = Class.new(::ActiveRecord::Migration)
-        metaclass = migration_class.class_eval { class << self; self; end }
-        metaclass.instance_eval { define_method(:up, &block) }
-
-        ::ActiveRecord::Migration.suppress_messages do
-          migration_class.migrate(:up)
-        end
-
-        @low_card_model.reset_column_information
-        LowCardTables::VersionSupport.clear_schema_cache!(@low_card_model)
-      end
-
-      def create_unique_index!
-        raise "Whoa -- there should never already be a unique index for #{@low_card_model}!" if current_unique_all_columns_index_name
-
-        table_name = @low_card_model.table_name
-        column_names = value_column_names
-        ideal_name = ideal_unique_all_columns_index_name
-
-        migrate do
-          remove_index table_name, :name => ideal_name rescue nil
-          add_index table_name, column_names, :unique => true, :name => ideal_name
-        end
-
-        unless current_unique_all_columns_index_name
-          raise "Whoa -- there should always be a unique index by now for #{@low_card_model}! We think we created one, but now it still doesn't exist?!?"
-        end
-
-        ideal_name
-      end
-
-      def current_unique_indexes
-        return [ ] if (! @low_card_model.table_exists?)
-        @low_card_model.connection.indexes(@low_card_model.table_name).select { |i| i.unique }
-      end
-
-      def current_unique_all_columns_index_name
-        index = current_unique_indexes.detect { |index| index.columns.sort == value_column_names.sort }
-        index.name if index
-      end
-
-      # We just limit all index names to this length -- this should be the smallest maximum index-name length that
-      # any database supports.
-      MINIMUM_MAX_INDEX_NAME_LENGTH = 63
-
-      def ideal_unique_all_columns_index_name
-        index_part_1 = "index_"
-        index_part_2 = "_lc_on_all"
-
-        remaining_characters = MINIMUM_MAX_INDEX_NAME_LENGTH - (index_part_1.length + index_part_2.length)
-        index_name = index_part_1 + (@low_card_model.table_name[0..(remaining_characters - 1)]) + index_part_2
-
-        index_name
-      end
-
       def row_map_to_id_map(m)
         if m.kind_of?(Hash)
           out = { }
-          m.each { |k,v| out[k] = v.id }
+          m.each do |k,v|
+            if v
+              out[k] = v.id
+            else
+              out[k] = nil
+            end
+          end
           out
         else
-          m.id
+          m.id if m
         end
       end
-
-
 
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
 
@@ -269,6 +133,7 @@ We're looking for an index on the following columns:
         complete_hashes = input_to_complete_hash_map.values
 
         existing = rows_matching(complete_hashes)
+        existing1 = existing.dup
         still_not_found = complete_hashes.reject { |h| existing[h].length > 0 }
 
         if still_not_found.length > 0 && do_create
@@ -276,8 +141,10 @@ We're looking for an index on the following columns:
         end
 
         out = { }
-        existing.each do |key, values|
-          if values.length != 1
+        input_to_complete_hash_map.each do |input, complete_hash|
+          values = existing[complete_hash]
+
+          if values.length == 0 && do_create
             raise %{Whoa: we asked for a row for this hash: #{key.inspect};
 since this has been asserted to be a complete key, we should only ever get back a single row,
 and we should always get back one row since we will have created the row if necessary,
@@ -286,7 +153,6 @@ but we got back these rows:
 #{values.inspect}}
           end
 
-          input = complete_hash_to_input_map[key]
           out[input] = values[0]
         end
 
@@ -383,7 +249,7 @@ The exception we got was:
           flush!(:creating_rows, :context => :after_import, :new_rows => hashes)
 
           existing = rows_matching(hashes)
-          still_not_found = hashes - existing.keys
+          still_not_found = hashes.reject { |h| existing[h].length > 0 }
 
           if still_not_found.length > 0
             raise LowCardTables::Errors::LowCardError, %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
