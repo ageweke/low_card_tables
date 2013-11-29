@@ -232,14 +232,14 @@ describe "LowCardTables bulk operations" do
       it "should allow for bulk retrieval of rows with exact matches by #{input_type}" do
         ensure_zero_database_calls do
           results = ::UserStatus.low_card_find_rows_for([ @hash1, @hash2, @hash3, @hash4, @hash5 ])
-          results.size.should == 3
+          results.size.should == 5
 
           verify_row(results[@hash1], false, false, 'male', 5)
           verify_row(results[@hash2], true, false, 'male', 5)
           verify_row(results[@hash3], false, false, 'female', 9)
 
-          results[@hash4].should_not be
-          results[@hash5].should_not be
+          results[@hash4].should be_nil
+          results[@hash5].should be_nil
         end
       end
 
@@ -247,14 +247,14 @@ describe "LowCardTables bulk operations" do
         ensure_zero_database_calls do
           input = to_desired_input_type([ @hash1, @hash2, @hash3, @hash4, @hash5 ], input_type)
           results = ::UserStatus.low_card_find_ids_for(input)
-          results.size.should == 3
+          results.size.should == 5
 
           results[input[0]].should == @hash1_id
           results[input[1]].should == @hash2_id
           results[input[2]].should == @hash3_id
 
-          results[input[3]].should_not be
-          results[input[4]].should_not be
+          results[input[3]].should be_nil
+          results[input[4]].should be_nil
         end
       end
     end
