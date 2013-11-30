@@ -1,14 +1,25 @@
 module LowCardTables
   module LowCardTable
+    # A TableUniqueIndex represents the concept of a unique index for a given low-card model class. I say "the concept",
+    # because there should only be one instance of this class for any given low-card model class -- there isn't one
+    # instance of this class for each actual unique index for the class in question.
+    #
+    # This class started as code that was directly part of the RowManager, and was factored out to create this class
+    # instead -- simply so that the RowManager wouldn't have any more code in it than necessary.
     class TableUniqueIndex
+      # Creates a new instance for the low-card model class in question.
       def initialize(low_card_model)
         unless low_card_model.respond_to?(:is_low_card_table?) && low_card_model.is_low_card_table?
-          raise "You must supply a low-card AR model class, not: #{low_card_model.inspect}"
+          raise ArgumentError, "You must supply a low-card AR model class, not: #{low_card_model.inspect}"
         end
 
         @low_card_model = low_card_model
       end
 
+      # Ensures that the unique index is present. If the index is present, does nothing else.
+      #
+      # If the index is not present, then looks at +create_if_needed+. If this evaluates to true, then it will create
+      # the index. If this evaluates to false, then it will raise an exception.
       def ensure_present!(create_if_needed)
         return unless @low_card_model.table_exists?
 
@@ -41,6 +52,7 @@ We're looking for an index on the following columns:
         end
       end
 
+      # Removes the unique index, if one is present. If one is not present, does nothing.
       def remove!
         table_name = low_card_model.table_name
         current_name = current_unique_all_columns_index_name
@@ -81,7 +93,7 @@ We're looking for an index on the following columns:
         raise "Whoa -- there should never already be a unique index for #{low_card_model}!" if current_unique_all_columns_index_name
 
         table_name = low_card_model.table_name
-        column_names = value_column_names
+        column_names = value_column_names.sort
         ideal_name = ideal_unique_all_columns_index_name
 
         migrate do
