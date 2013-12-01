@@ -6,13 +6,21 @@ require 'low_card_tables/low_card_table/row_collapser'
 
 module LowCardTables
   module LowCardTable
-    # In many ways, the RowManager is the beating heart of +low_card_tables+. Its job is to
+    # In many ways, the RowManager is the beating heart of +low_card_tables+. It is responsible for finding and
+    # creating rows in low-card tables, as well as maintaining the unique index across all columns in the table and
+    # dealing with any needs from migrations.
+    #
+    # Because this class is quite complex, some pieces of functionality have been broken out into other classes.
+    # The TableUniqueIndex is responsible for maintaining the unique index across all columns in the table, and
+    # the RowCollapser handles the case where rows need to be collapsed (unified) because a column was removed from
+    # the low-card table.
     class RowManager
       attr_reader :low_card_model
 
+      # Creates a new instance for the given low-card model.
       def initialize(low_card_model)
         unless low_card_model.respond_to?(:is_low_card_table?) && low_card_model.is_low_card_table?
-          raise "You must supply a low-card AR model class, not: #{low_card_model.inspect}"
+          raise ArgumentError, "You must supply a low-card AR model class, not: #{low_card_model.inspect}"
         end
 
         @low_card_model = low_card_model
@@ -22,14 +30,28 @@ module LowCardTables
 
       attr_reader :referring_models
 
+      # Tells us that the low-card model we're operating on behalf of is referenced by the given +referring_model_class+.
+      # This +referring_model_class+ should be an ActiveRecord class that has declared 'has_low_card_table' on this
+      # low-card table.
+      #
+      # We keep track of this and expose it for a few reasons:
+      #
+      # * If we need to collapse the rows in this low-card table because a column has been removed, we use this list of
+      #   referring models to know which columns have a foreign key to this table;
+      # * When someone calls #reset_column_information on the low-card table, we re-compute (and re-install) the set of
+      #   delegated methods from all models that refer to this low-card table.
       def referred_to_by(referring_model_class)
         @referring_models |= [ referring_model_class ]
       end
 
+      # Tells us that someone called #reset_column_information on the low-card table; we'll inform all referring models
+      # of that fact.
       def column_information_reset!
         @referring_models.each { |m| m._low_card_associations_manager.low_card_column_information_reset!(@low_card_model) }
       end
 
+      # Returns all rows in the low-card table. This behaves semantically identically to simply calling ActiveRecord's
+      # #all method on the low-card table itself, but it returns the data from cache.
       def all_rows
         cache.all_rows
       end
@@ -408,8 +430,11 @@ equivalent of 'LOCK TABLE'(s) in your database.}
       end
 
       def cache
-        if @cache && cache_expiration_policy_object.stale?(@cache.loaded_at, current_time)
-          flush!(:stale, :loaded => @cache.loaded_at, :now => current_time)
+        the_current_time = current_time
+        cache_loaded_at = @cache.loaded_at if @cache
+
+        if @cache && cache_expiration_policy_object.stale?(cache_loaded_at, the_current_time)
+          flush!(:stale, :loaded => cache_loaded_at, :now => the_current_time)
           @cache = nil
         end
 
