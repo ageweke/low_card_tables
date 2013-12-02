@@ -512,7 +512,7 @@ describe LowCardTables::LowCardTable::RowManager do
           cache2 = expect_cache_creation
           expect(cache2).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-          expect(@low_card_model).to receive(:import).once.and_raise(ActiveRecord::StatementInvalid)
+          expect(@low_card_model).to receive(:import).once.and_raise(ActiveRecord::StatementInvalid.new("boom"))
 
           exception = capture_exception { @instance.find_or_create_rows_for([ :foo => 'bar', :bar => 'baz' ]) }
           exception.class.should == LowCardTables::Errors::LowCardInvalidLowCardRowsError
@@ -701,7 +701,7 @@ describe LowCardTables::LowCardTable::RowManager do
           cache2 = expect_cache_creation
           expect(cache2).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-          expect(@low_card_model).to receive(:import).once.and_raise(ActiveRecord::StatementInvalid)
+          expect(@low_card_model).to receive(:import).once.and_raise(ActiveRecord::StatementInvalid.new("boom"))
 
           exception = capture_exception { @instance.find_or_create_ids_for([ :foo => 'bar', :bar => 'baz' ]) }
           exception.class.should == LowCardTables::Errors::LowCardInvalidLowCardRowsError

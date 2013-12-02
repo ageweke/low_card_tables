@@ -1,6 +1,9 @@
 module LowCardTables
+  # Contains methods used by the codebase to support differing ActiveRecord versions. This is just a clean way of
+  # factoring out differing ActiveRecord API into a single class.
   class VersionSupport
     class << self
+      # Clear the schema cache for a given model.
       def clear_schema_cache!(model)
         if model.connection.respond_to?(:schema_cache)
           model.connection.schema_cache.clear!
@@ -9,14 +12,18 @@ module LowCardTables
         end
       end
 
+      # Can you specify a block on default_scope? This was added in ActiveRecord 3.1.
       def default_scopes_accept_a_block?
         ! (::ActiveRecord::VERSION::MAJOR <= 3 && ::ActiveRecord::VERSION::MINOR == 0)
       end
 
+      # Is #migrate a class method, or an instance method, on ActiveRecord::Migration? It changed to an instance method
+      # as of ActiveRecord 3.1.
       def migrate_is_a_class_method?
         (::ActiveRecord::VERSION::MAJOR <= 3 && ::ActiveRecord::VERSION::MINOR == 0)
       end
 
+      # Define a default scope on the class in question. This is only actually used from our specs.
       def define_default_scope(klass, conditions)
         if default_scopes_accept_a_block?
           if conditions

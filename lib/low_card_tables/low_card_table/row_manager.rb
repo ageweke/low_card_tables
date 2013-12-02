@@ -434,7 +434,7 @@ The exception we got was:
           still_not_found = hashes.reject { |h| existing[h].length > 0 }
 
           if still_not_found.length > 0
-            raise LowCardTables::Errors::LowCardError, %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
+            raise %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
 but, when we tried to create them, even after an import that appeared to succeed, we couldn't
 find the models that should've now existed. This should never happen, and may be indicative
 of a bug in the low-card tables system. Here's what we tried to create, but then couldn't find:
