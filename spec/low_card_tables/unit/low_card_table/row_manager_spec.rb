@@ -71,6 +71,9 @@ describe LowCardTables::LowCardTable::RowManager do
       allow(@low_card_model).to receive(:table_exists?).and_return(true)
       allow(@low_card_model).to receive(:table_name).and_return("thetablename")
 
+      @table_unique_index = double("table_unique_index")
+      allow(LowCardTables::LowCardTable::TableUniqueIndex).to receive(:new).with(@low_card_model).and_return(@table_unique_index)
+
       @column_id = double("column_id")
       allow(@column_id).to receive(:name).and_return("id")
       allow(@column_id).to receive(:primary).and_return(true)
@@ -735,6 +738,37 @@ describe LowCardTables::LowCardTable::RowManager do
 
         @instance.value_column_names.should == %w{foo bar}
       end
+    end
+
+    it "should call through to RowCollapser on #collapse_rows_and_update_referrers!" do
+      cache = expect_cache_creation
+      expect(cache).to receive(:all_rows).once.and_return(:allrows)
+
+      @instance.all_rows.should == :allrows
+
+      collapser = double("collapser")
+      expect(LowCardTables::LowCardTable::RowCollapser).to receive(:new).once.with(@low_card_model, { :abc => :def }).and_return(collapser)
+
+      collapse_map = double("collapse_map")
+      expect(collapser).to receive(:collapse!).once.with().and_return(collapse_map)
+
+      @instance.collapse_rows_and_update_referrers!(:abc => :def).should be(collapse_map)
+
+      @cache_flushes.length.should == 1
+      @cache_flushes[0].should == { :reason => :collapse_rows_and_update_referrers, :low_card_model => @low_card_model }
+    end
+
+    it "should call through to the TableUniqueIndex on #ensure_has_unique_index!" do
+      expect(@table_unique_index).to receive(:ensure_present!).once.with(false)
+      @instance.ensure_has_unique_index!
+
+      expect(@table_unique_index).to receive(:ensure_present!).once.with(true)
+      @instance.ensure_has_unique_index!(true)
+    end
+
+    it "should call through to the TableUniqueIndex on #remove_unique_index!" do
+      expect(@table_unique_index).to receive(:remove!).once
+      @instance.remove_unique_index!
     end
   end
 end

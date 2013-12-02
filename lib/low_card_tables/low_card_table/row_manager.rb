@@ -192,6 +192,8 @@ module LowCardTables
         value_columns.map(&:name)
       end
 
+      # Iterates through this table, finding duplicate rows and collapsing them. See RowCollapser for far more
+      # information.
       def collapse_rows_and_update_referrers!(low_card_options = { })
         collapser = LowCardTables::LowCardTable::RowCollapser.new(@low_card_model, low_card_options)
         collapse_map = collapser.collapse!
@@ -200,10 +202,16 @@ module LowCardTables
         collapse_map
       end
 
+      # If this table already has the correct unique index across all value columns, does nothing.
+      #
+      # If this table does not have the correct unique index, and +create_if_needed+ is truthy, then creates the index.
+      # If this table does not have the correct unique index, and +create_if_needed+ is falsy, then raises
+      # LowCardTables::Errors::LowCardNoUniqueIndexError.
       def ensure_has_unique_index!(create_if_needed = false)
         @table_unique_index.ensure_present!(create_if_needed)
       end
 
+      # If this table currently has a unique index across all value columns, removes it.
       def remove_unique_index!
         @table_unique_index.remove!
       end
