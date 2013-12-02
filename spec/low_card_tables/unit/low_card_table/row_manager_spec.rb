@@ -330,6 +330,62 @@ describe LowCardTables::LowCardTable::RowManager do
         lambda { @instance.find_rows_for({ :bar => 'baz' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotSpecifiedError)
         lambda { @instance.find_rows_for({ :foo => 'bar', :quux => 'aa' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotPresentError)
       end
+
+      it "should return a single row if a single Hash is specified" do
+        row = double("row")
+
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ row ])
+
+        @instance.find_rows_for({ :foo => 'bar', :bar => 'baz' }).should be(row)
+      end
+
+      it "should return nil if no rows match" do
+        row = double("row")
+
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
+
+        @instance.find_rows_for({ :foo => 'bar', :bar => 'baz' }).should == nil
+      end
+
+      it "should return a Hash if multiple Hashes are specified" do
+        row1 = double("row1")
+        row2 = double("row2")
+
+        cache = expect_cache_creation
+        rows_matching_args = [ ]
+        expect(cache).to receive(:rows_matching).once do |*args|
+          rows_matching_args << args
+          { { 'foo' => 'bar', 'bar' => 'baz' } => [ row1 ],
+            { 'foo' => 'a', 'bar' => 'b' } => [ row2 ],
+            { 'foo' => 'c', 'bar' => 'd' } => [ ] }
+        end
+
+        @instance.find_rows_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c', :bar => 'd'} ]).should == {
+          { :foo => 'bar', :bar => 'baz' } => row1,
+          { :foo => 'a', :bar => 'b' } => row2,
+          { :foo => 'c', :bar => 'd' } => nil }
+
+        rows_matching_args.length.should == 1
+        call_1 = rows_matching_args[0]
+        call_1.length.should == 1
+        input_array = call_1[0]
+        input_array.length.should == 3
+
+        input_array.detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+        input_array.detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+        input_array.detect { |e| e == { 'foo' => 'c', 'bar' => 'd' } }.should be
+      end
+
+      it "should fill in default values correctly" do
+        row = double("row")
+
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'yohoho' } ]).and_return({ 'foo' => 'bar', 'bar' => 'yohoho' } => [ row ])
+
+        @instance.find_rows_for({ :foo => 'bar' }).should be(row)
+      end
     end
   end
 end
