@@ -1,7 +1,7 @@
 rvm:
-    - "1.8.7"
-    - "1.9.3"
-    - "2.0.0"
+    # - "1.8.7"
+    # - "1.9.3"
+    # - "2.0.0"
     - "jruby-1.7.6"
 env:
     # Sadly, Travis seems to have a version of SQLite < 3.7.11 installed on many of its workers;
@@ -21,7 +21,7 @@ env:
     - LOW_CARD_TABLES_AR_TEST_VERSION=4.0.1 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=postgres
     # - LOW_CARD_TABLES_AR_TEST_VERSION=4.0.1 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=sqlite
 before_script:
-    - export JRUBY_OPTS="-J-Xmx1024m -J-Xss512k $JRUBY_OPTS"
+    - export JRUBY_OPTS="-J-Xmx1024m -J-Xms1024m $JRUBY_OPTS"
     - mysql -e 'create database myapp_test;'
     - psql -c 'create database myapp_test;' -U postgres
 matrix:
