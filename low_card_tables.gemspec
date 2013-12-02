@@ -8,8 +8,8 @@ Gem::Specification.new do |s|
   s.authors     = ["Andrew Geweke"]
   s.email       = ["andrew@geweke.org"]
   s.homepage    = "https://github.com/ageweke/low_card_tables"
-  s.summary     = %q{Instead of storing multiple columns with low cardinality (few distinct values) directly in a table, which results in performance and maintainability problems, break them out into a separate table with almost zero overhead. Trivially add new columns without migrating a main, enormous table. Query on combinations of values very efficiently.}
-  s.description = %q{Store low-cardinality columns in a separate table for vastly more flexibility and better performance.}
+  s.summary     = %q{"Bitfields for ActiveRecord": instead of storing multiple columns with low cardinality (few distinct values) directly in a table, which results in performance and maintainability problems, break them out into a separate table with almost zero overhead. Trivially add new columns without migrating a main, enormous table. Query on combinations of values very efficiently.}
+  s.description = %q{"Bitfields for ActiveRecord": store low-cardinality columns in a separate table for vastly more flexibility and better performance.}
   s.license     = "MIT"
 
   s.files         = `git ls-files`.split("\n")
