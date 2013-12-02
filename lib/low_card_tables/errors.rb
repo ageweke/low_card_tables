@@ -3,6 +3,9 @@ module LowCardTables
     class LowCardError < StandardError; end
 
     class LowCardColumnError < LowCardError; end
+
+    # Raised when the client specifies a column in a low-card table that doesn't actually exist -- for example, when
+    # trying to create new rows, or match against existing rows.
     class LowCardColumnNotPresentError < LowCardColumnError; end
     class LowCardColumnNotSpecifiedError < LowCardColumnError; end
 

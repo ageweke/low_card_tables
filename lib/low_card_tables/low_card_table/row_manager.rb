@@ -218,6 +218,9 @@ module LowCardTables
 
 
       private
+      # Given a Hash that maps keys to instances of the low-card class, returns a Hash that is identical in every way
+      # except that rows are replaced with their IDs. This is what we use to implement, for example,
+      # #find_or_create_ids_for on top of #find_or_create_rows_for, trivially.
       def row_map_to_id_map(m)
         if m.kind_of?(Hash)
           out = { }
@@ -234,8 +237,15 @@ module LowCardTables
         end
       end
 
-      COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
-
+      # This is used to implement #rows_matching and #ids_matching on top of the Cache. +hash_or_hashes+ is a single
+      # Hash or an array of Hashes, +block+ is a callable block (and you're only allowed to pass +hash_or_hashes+ _or_
+      # +block+, not both), and +method_name+ is the name of the method on Cache that we should call to implement this
+      # method.
+      #
+      # Since Cache does most of the work for us, this method is basically responsible for sanitizing input/output, and
+      # detecting schema-change issues (as evidenced by LowCardColumnNotPresentError) and retrying, once. (This is so
+      # that if code starts using a column name that was not present on the table at the last time the cache was read,
+      # but since has been migrated in, we'll detect the change and react correctly.)
       def do_matching(hash_or_hashes, block, method_name)
         result = begin
           hashes = to_array_of_partial_hashes(hash_or_hashes)
@@ -254,20 +264,31 @@ module LowCardTables
         end
       end
 
+      # This is used to implement #find_rows_for and #find_or_create_rows_for; the two methods are very similar except
+      # in how they handle nonexistent rows, so we use this method to deal with both of them.
       def do_find_or_create(hash_hashes_object_or_objects, do_create)
+        # Input manipulation...
         input_to_complete_hash_map = map_input_to_complete_hashes(hash_hashes_object_or_objects)
-        complete_hash_to_input_map = input_to_complete_hash_map.invert
-
         complete_hashes = input_to_complete_hash_map.values
 
+        # Do the actual lookup in the cache.
         existing = rows_matching(complete_hashes)
-        existing1 = existing.dup
-        still_not_found = complete_hashes.reject { |h| existing[h].length > 0 }
+        not_found = complete_hashes.reject { |h| existing[h].length > 0 }
 
-        if still_not_found.length > 0 && do_create
+        # See if there's something we still don't have and if we need to create it.
+        if not_found.length > 0 && do_create
+          # We actually pass in _all_ the rows we want here, rather than just the ones that aren't found yet. Why?
+          # Under the covers, #flush_lock_and_create_rows_for! is at the heart of our transactional core -- it locks
+          # the table and checks again for which rows are present. We want to give it all of the data required, so that,
+          # once it acquires the exclusive table-level lock, it knows exactly which data it needs to ensure is present
+          # in the table.
+          #
+          # Passing data acquired outside a transaction into a transaction that's supposed to act on it is just asking
+          # for trouble.
           existing = flush_lock_and_create_rows_for!(complete_hashes)
         end
 
+        # Output manipulation and validation.
         out = { }
         input_to_complete_hash_map.each do |input, complete_hash|
           values = existing[complete_hash]
@@ -291,6 +312,14 @@ but we got back these rows:
         end
       end
 
+      # Returns all of the ::ActiveRecord::ConnectionAdapters::Column objects for all of the value columns in this
+      # table.
+      #
+      # If this table doesn't exist yet, we return an empty set. This is important: this allows your Rails app to still
+      # pass through the boot phase if you have a model for a low-card model whose underlying database table hasn't
+      # actually been created yet. (If we didn't do this, then the traditional pattern of adding a migration and a model
+      # in the same commit would fail -- other developers would get the model but not have the table, and Rails wouldn't
+      # even be able to boot to migrate the table in.)
       def value_columns
         return [ ] unless @low_card_model.table_exists?
 
@@ -304,6 +333,15 @@ but we got back these rows:
         end
       end
 
+      # This simply raises an exception when we can't create new rows in the low-card table for some reason. We want
+      # to get a very nice, detailed message in return, so we have a method that composes something telling us exactly
+      # what happened.
+      #
+      # +exception+ is the exception we got upon creation, if any. +keys+ is the set of keys (names of columns) we
+      # passed to the #import call, and +failed_instances+ is the set of instances that +activerecord_import+ reported
+      # as failing.
+      #
+      # This method eventually raises a LowCardInvalidLowCardRowsError.
       def could_not_create_new_rows!(exception, keys, failed_instances)
         message = %{The low_card_tables gem was trying to create one or more new rows in
 the low-card table '#{@low_card_model.table_name}', but, when we went to create those rows...
@@ -345,6 +383,24 @@ The exception we got was:
         raise LowCardTables::Errors::LowCardInvalidLowCardRowsError, message
       end
 
+      # This method is called when someone has called #find_or_create_rows_for or #find_or_create_ids_for, and we've
+      # discovered that we do, in fact, need to create one or more rows in the database.
+      #
+      # Because we need to be careful of race conditions -- many other processes may be running the exact same code at
+      # the exact same time -- we do the following:
+      #
+      # * First, obtain an exclusive table lock for the database we're using. Exactly how this works is database-
+      #   dependent and not something ActiveRecord knows how to handle for us.
+      # * Flush the cache and re-check if we still need to create rows. We do this because it's possible some other
+      #   process created the rows in-between the time we checked and the time we locked the table. But, now, if we
+      #   still are missing rows, we know we're the only process who can create them, since we have the exclusive
+      #   table lock.
+      # * Create the rows in the database, raising a detailed exception if the database raises an exception or if
+      #   +activerecord_import+ reports any failed instances.
+      # * Fire an ActiveSupport::Notifications event telling everybody that we just created rows.
+      # * Flush the cache again, since we just created rows in the database and so the cache is guaranteed to be
+      #   out-of-date.
+      # * Return the rows that now should be present and match the input.
       def flush_lock_and_create_rows_for!(input)
         with_locked_table do
           flush!(:creating_rows, :context => :before_import, :new_rows => input)
@@ -362,16 +418,14 @@ The exception we got was:
               keys.map { |k| hash[k] }
             end
 
-            import_result = nil
             begin
-              instrument('rows_created', :keys => keys, :values => values) do
-                import_result = @low_card_model.import(keys, values, :validate => true)
-              end
+              import_result = @low_card_model.import(keys, values, :validate => true)
+              could_not_create_new_rows!(nil, keys, import_result.failed_instances) if import_result.failed_instances.length > 0
             rescue ::ActiveRecord::StatementInvalid => si
               could_not_create_new_rows!(si, keys, values)
             end
 
-            could_not_create_new_rows!(nil, keys, import_result.failed_instances) if import_result.failed_instances.length > 0
+            instrument('rows_created', :keys => keys, :values => values)
           end
 
           flush!(:creating_rows, :context => :after_import, :new_rows => hashes)
@@ -382,8 +436,8 @@ The exception we got was:
           if still_not_found.length > 0
             raise LowCardTables::Errors::LowCardError, %{You asked for low-card IDs for one or more hashes specifying rows that didn't exist,
 but, when we tried to create them, even after an import that appeared to succeed, we couldn't
-find the models that should've now existed. Here's what we tried to create, but then
-couldn't find:
+find the models that should've now existed. This should never happen, and may be indicative
+of a bug in the low-card tables system. Here's what we tried to create, but then couldn't find:
 
 #{still_not_found.join("\n")}}
           end
@@ -392,6 +446,8 @@ couldn't find:
         end
       end
 
+      # Locks the table for this @low_card_model, using whatever database-specific code is required. This also surrounds
+      # the block passed with a transaction on the table in question.
       def with_locked_table(&block)
         @low_card_model.transaction do
           with_database_exclusive_table_lock do
@@ -400,6 +456,17 @@ couldn't find:
         end
       end
 
+      # Obtains an exclusive lock on the table for this low-card model. This is much, much stronger than the built-in
+      # ActiveRecord #lock! or #with_lock support (see ActiveRecord::Locking::Pessimistic); this should always lock
+      # the entire table against reading and writing.
+      #
+      # We could've handled this by injecting methods into the ActiveRecord connection adapters for each specific
+      # database type, but that's actually quite a bit more tricky metaprogramming (what if the adapters haven't been
+      # loaded yet when our Gem starts up, but will get loaded later? -- and we definitely don't want to make this
+      # Gem depend on the union of all supported database adapters!) than doing it this way.
+      #
+      # In other words, this may be a bit of a gross hack (groping the class name of the adapter in question), but it's
+      # arguably a lot more reliable and easier to understand than the other way of doing this.
       def with_database_exclusive_table_lock(&block)
         case @low_card_model.connection.class.name
         when /postgresql/i then with_database_exclusive_table_lock_postgresql(&block)
@@ -417,6 +484,9 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         end
       end
 
+      # Obtains an exclusive table lock for a PostgreSQL database. PostgreSQL releases all table locks at the end of
+      # the current transaction, so we just need to lock the table -- unlocking happens automatically when we release
+      # our transaction, above.
       def with_database_exclusive_table_lock_postgresql(&block)
         # If we just use the regular :sanitize_sql support, we get:
         #    LOCK TABLE 'foo'
@@ -426,11 +496,14 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         block.call
       end
 
+      # Obtains an exclusive table lock for a SQLite database. There is no locking possible or needed, since SQLite is
+      # a single-user database.
       def with_database_exclusive_table_lock_sqlite(&block)
-        # There is no locking possible.
         block.call
       end
 
+      # Obtains an exclusive table lock for a MySQL database. We need to make sure we unlock the table once the block
+      # is complete.
       def with_database_exclusive_table_lock_mysql(&block)
         begin
           escaped = @low_card_model.connection.quote_table_name(@low_card_model.table_name)
@@ -445,10 +518,17 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         end
       end
 
+      # Runs a SQL statement, specified as a string with substitution parameters.
       def run_sql(statement, params)
         @low_card_model.connection.execute(@low_card_model.send(:sanitize_sql, [ statement, params ]))
       end
 
+      # Names of columns in low-card tables that we should always skip, no matter what.
+      COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
+
+      # Returns the names of all columns in this table that we should skip when determining what to treat as a value
+      # column for this table (as opposed to things like the primary key, created_at, updated_at, and so on, which are
+      # metadata and shouldn't play a direct role in the low-card system).
       def column_names_to_skip
         @column_names_to_skip ||= begin
           COLUMN_NAMES_TO_ALWAYS_SKIP +
@@ -468,7 +548,7 @@ equivalent of 'LOCK TABLE'(s) in your database.}
       # #rows_matching/#ids_matching, where each input may match multiple low-card rows.
       def map_input_to_complete_hashes(hash_hashes_object_or_objects)
         # We can't use Array(), because that will turn a single Hash into an Array, and we definitely don't want
-        # to do that here!
+        # to do that here! I kind of hate that behavior of Array()...
         as_array = if hash_hashes_object_or_objects.kind_of?(Array) then hash_hashes_object_or_objects else [ hash_hashes_object_or_objects ] end
 
         out = { }
@@ -476,6 +556,7 @@ equivalent of 'LOCK TABLE'(s) in your database.}
           hash = nil
 
           if hash_or_object.kind_of?(Hash)
+            # Allow us to use Strings or Symbols as indexes into the Hash
             hash = hash_or_object.with_indifferent_access
           elsif hash_or_object.kind_of?(@low_card_model)
             hash = hash_or_object.attributes.dup.with_indifferent_access
@@ -491,6 +572,13 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         out
       end
 
+      # Given a single Hash that should contain values for all value columns in the low-card table -- no less, no more --
+      # validates that the Hash contains no extra columns and no missing columns, and returns it. This method will allow
+      # you to skip any columns in the input that have defaults in the database, and will correctly fill in those defaults
+      # in the returned Hash.
+      #
+      # Because this requires all columns to be present in the input, it can only be used for methods like
+      # #find_rows_for or #find_or_create_ids_for that require fully-specified input hashes.
       def ensure_complete_key(hash)
         keys_as_strings = hash.keys.map(&:to_s)
         missing = value_column_names - keys_as_strings
@@ -517,19 +605,18 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         hash
       end
 
+      # Given something that may be a single Hash or an array of Hashes, returns an array of Hashes, and makes sure that
+      # the input (or each element of the input) is a valid partial key into the low-card table. A partial key is a Hash
+      # that specifies zero or more value columns from the low-card table -- but you're not allowed to specify anything
+      # in the Hash that isn't a value column in the low-card table.
       def to_array_of_partial_hashes(array)
         array = if array.kind_of?(Array) then array else [ array ] end
         array.each { |h| assert_partial_key!(h) }
         array
-
-        # array.map do |hash|
-        #   out = hash
-        #   out = hash.with_indifferent_access
-        #   assert_partial_key!(out)
-        #   out
-        # end
       end
 
+      # Given a Hash, raises an error if that Hash is not a valid partial key into the low-card table -- i.e., if it
+      # contains keys that are not valid value columns in the low-card table.
       def assert_partial_key!(hash)
         keys_as_strings = hash.keys.map(&:to_s)
         extra = keys_as_strings - value_column_names
@@ -539,13 +626,14 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         end
       end
 
+      # Fetches the cache we should use. This takes care of creating a cache if one is not present; it also takes care
+      # of flushing the cache and creating a new one if the current cache is stale.
       def cache
         the_current_time = current_time
         cache_loaded_at = @cache.loaded_at if @cache
 
         if @cache && cache_expiration_policy_object.stale?(cache_loaded_at, the_current_time)
           flush!(:stale, :loaded => cache_loaded_at, :now => the_current_time)
-          @cache = nil
         end
 
         unless @cache
@@ -557,6 +645,13 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         @cache
       end
 
+      # Flushes the cache, for the reason given, and fires the appropriate ActiveSupport::Notification instrumentation.
+      # +reason+ is the reason given in the notification, and +notification_options+ are added to the payload for the
+      # notification.
+      #
+      # Whenever we flush the cache, we also ask ActiveRecord to purge its idea of what columns are on the table. This
+      # ensures that we'll stay in sync with any underlying schema changes, and hence adapt to an evolving schema on
+      # the fly, as best we can.
       def flush!(reason, notification_options = { })
         if @cache
           instrument('cache_flush', notification_options.merge(:reason => reason)) do
@@ -567,14 +662,17 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         @low_card_model.reset_column_information
       end
 
+      # A thin wrapper around ActiveSupport::Notifications.
       def instrument(event, options = { }, &block)
         ::ActiveSupport::Notifications.instrument("low_card_tables.#{event}", options.merge(:low_card_model => @low_card_model), &block)
       end
 
+      # Returns the correct cache-expiration policy object to use for the table in question.
       def cache_expiration_policy_object
         @low_card_model.low_card_cache_expiration_policy_object || LowCardTables.low_card_cache_expiration_policy_object
       end
 
+      # Returns the current time. Broken out into a separate method so that we can easily override it in tests.
       def current_time
         Time.now
       end

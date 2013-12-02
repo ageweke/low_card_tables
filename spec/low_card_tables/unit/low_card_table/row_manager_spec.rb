@@ -9,6 +9,18 @@ describe LowCardTables::LowCardTable::RowManager do
     LowCardTables::LowCardTable::RowManager
   end
 
+  def capture_exception(&block)
+    out = begin
+      block.call
+      nil
+    rescue Exception => e
+      e
+    end
+
+    raise "exception expected, but not raised" unless e
+    e
+  end
+
   before :each do
     klass.class_eval do
       class << self
@@ -47,6 +59,12 @@ describe LowCardTables::LowCardTable::RowManager do
     cf = @cache_flushes
     ::ActiveSupport::Notifications.subscribe("low_card_tables.cache_flush") do |name, start, finish, id, payload|
       cf << payload
+    end
+
+    @rows_created = [ ]
+    rc = @rows_created
+    ::ActiveSupport::Notifications.subscribe("low_card_tables.rows_created") do |name, start, finish, id, payload|
+      rc << payload
     end
   end
 
@@ -473,113 +491,176 @@ describe LowCardTables::LowCardTable::RowManager do
         @instance.find_or_create_rows_for({ :foo => 'bar', :bar => 'baz' }).should be(row)
       end
 
-      it "should create new rows if not present, with one import command, and apply defaults" do
-        connection = double("connection")
-        allow(@low_card_model).to receive(:connection).and_return(connection)
-        allow(connection).to receive(:quote_table_name) { |tn| "<#{tn}>" }
-        connection_class = double("connection_class")
-        allow(connection_class).to receive(:name).and_return("some_postgresql_connection")
-        allow(connection).to receive(:class).and_return(connection_class)
-        allow(@low_card_model).to receive(:sanitize_sql).once.with([ "LOCK TABLE <thetablename>", { } ]).and_return("quoted-lock-tables")
+      context "with setup to actually run import" do
+        before :each do
+          connection = double("connection")
+          allow(@low_card_model).to receive(:connection).and_return(connection)
+          allow(connection).to receive(:quote_table_name) { |tn| "<#{tn}>" }
+          connection_class = double("connection_class")
+          allow(connection_class).to receive(:name).and_return("some_postgresql_connection")
+          allow(connection).to receive(:class).and_return(connection_class)
+          allow(@low_card_model).to receive(:sanitize_sql).once.with([ "LOCK TABLE <thetablename>", { } ]).and_return("quoted-lock-tables")
 
-        expect(@low_card_model).to receive(:transaction).once { |*args, &block| block.call }
-        expect(connection).to receive(:execute).once.with("quoted-lock-tables")
-
-        cache1 = expect_cache_creation
-        expect(cache1).to receive(:all_rows).once.and_return(:allrows)
-        allow(cache1).to receive(:loaded_at).once.and_return(12345)
-        expect_cache_validation(cache1, 12345, 2, false)
-
-        @instance.all_rows.should == :allrows
-
-        existing_row = double("existing_row")
-        cache_input = [
-          { 'foo' => 'bar', 'bar' => 'baz' },
-          { 'foo' => 'a', 'bar' => 'b' },
-          { 'foo' => 'c', 'bar' => 'yohoho' }
-        ]
-        cache_output = {
-          { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
-          { 'foo' => 'a', 'bar' => 'b' } => [ ],
-          { 'foo' => 'c', 'bar' => 'yohoho' } => [ ]
-        }
-
-        cache_1_input = [ ]
-        expect(cache1).to receive(:rows_matching).once { |*args| cache_1_input << args; cache_output }
-
-        cache2 = expect_cache_creation
-        cache_2_input = [ ]
-        expect(cache2).to receive(:rows_matching).once { |*args| cache_2_input << args; cache_output }
-
-        import_result = double("import_result")
-        expect(import_result).to receive(:failed_instances).and_return([ ])
-        import_args = [ ]
-        expect(@low_card_model).to receive(:import).once { |*args| import_args << args; import_result }
-
-        new_row_1 = double("new_row_1")
-        new_row_2 = double("new_row_2")
-        cache3 = expect_cache_creation
-        cache_3_input = [ ]
-        expect(cache3).to receive(:rows_matching).once do |*args|
-          cache_3_input << args
-
-          { { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
-            { 'foo' => 'a', 'bar' => 'b' } => [ new_row_1 ],
-            { 'foo' => 'c', 'bar' => 'yohoho' } => [ new_row_2 ] }
+          expect(@low_card_model).to receive(:transaction).once { |*args, &block| block.call }
+          expect(connection).to receive(:execute).once.with("quoted-lock-tables")
         end
 
-        result = @instance.find_or_create_rows_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c' } ])
-        result.size.should == 3
-        result[{ :foo => 'bar', :bar => 'baz' }].should be(existing_row)
-        result[{ :foo => 'a', :bar => 'b' }].should be(new_row_1)
-        result[{ :foo => 'c' }].should be(new_row_2)
+        it "should raise a LowCardInvalidLowCardRowsError if the database refuses to import the rows with an exception" do
+          cache1 = expect_cache_creation
+          expect(cache1).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-        cache_1_input.length.should == 1
-        cache_1_input[0].length.should == 1
-        cache_1_input[0][0].length.should == 3
-        cache_1_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
-        cache_1_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
-        cache_1_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+          cache2 = expect_cache_creation
+          expect(cache2).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-        cache_2_input.length.should == 1
-        cache_2_input[0].length.should == 1
-        cache_2_input[0][0].length.should == 3
-        cache_2_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
-        cache_2_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
-        cache_2_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+          expect(@low_card_model).to receive(:import).once.and_raise(ActiveRecord::StatementInvalid)
 
-        cache_3_input.length.should == 1
-        cache_3_input[0].length.should == 1
-        cache_3_input[0][0].length.should == 3
-        cache_3_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
-        cache_3_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
-        cache_3_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+          exception = capture_exception { @instance.find_or_create_rows_for([ :foo => 'bar', :bar => 'baz' ]) }
+          exception.class.should == LowCardTables::Errors::LowCardInvalidLowCardRowsError
+          exception.message.should match(/thetablename/i)
+          exception.message.should match(/ActiveRecord::StatementInvalid/i)
+          exception.message.should match(/foo.*bar/i)
+          exception.message.should match(/bar.*baz/i)
 
-        import_args.length.should == 1
-        import_args[0].length.should == 3
-        import_args[0][0].should == [ 'foo', 'bar' ]
-        import_args[0][1].length.should == 2
-        import_args[0][1].detect { |a| a == ['a', 'b'] }.should be
-        import_args[0][1].detect { |a| a == ['c', 'yohoho'] }.should be
-        import_args[0][2].should == { :validate => true }
+          @rows_created.length.should == 0
+        end
 
-        @cache_flushes.length.should == 2
+        it "should raise a LowCardInvalidLowCardRowsError if the database refuses to import the rows with an import failure" do
+          cache1 = expect_cache_creation
+          expect(cache1).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-        @cache_flushes[0][:reason].should == :creating_rows
-        @cache_flushes[0][:low_card_model].should be(@low_card_model)
-        @cache_flushes[0][:context].should == :before_import
-        @cache_flushes[0][:new_rows].length.should == 3
-        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
-        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
-        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+          cache2 = expect_cache_creation
+          expect(cache2).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-        @cache_flushes[1][:reason].should == :creating_rows
-        @cache_flushes[1][:low_card_model].should be(@low_card_model)
-        @cache_flushes[1][:context].should == :after_import
-        @cache_flushes[1][:new_rows].length.should == 3
-        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
-        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
-        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+          failed_instance_1 = double("failed_instance_1")
+          errors_1 = double("errors_1")
+          allow(failed_instance_1).to receive(:errors).and_return(errors_1)
+          allow(errors_1).to receive(:full_messages).and_return(%w{error1a error1b error1c})
+
+          failed_instance_2 = double("failed_instance_2")
+          errors_2 = double("errors_2")
+          allow(failed_instance_2).to receive(:errors).and_return(errors_2)
+          allow(errors_2).to receive(:full_messages).and_return(%w{error2a error2b error2c})
+
+          import_result = double("import_result")
+          expect(import_result).to receive(:failed_instances).at_least(:once).and_return([ failed_instance_1, failed_instance_2 ])
+          expect(@low_card_model).to receive(:import).once.and_return(import_result)
+
+          exception = capture_exception { @instance.find_or_create_rows_for([ :foo => 'bar', :bar => 'baz' ]) }
+          exception.class.should == LowCardTables::Errors::LowCardInvalidLowCardRowsError
+          exception.message.should match(/thetablename/i)
+          exception.message.should match(/failed_instance_1/i)
+          exception.message.should match(/failed_instance_2/i)
+          exception.message.should match(/foo.*bar/i)
+          exception.message.should match(/error1a.*error1b.*error1c/i)
+          exception.message.should match(/error2a.*error2b.*error2c/i)
+
+          @rows_created.length.should == 0
+        end
+
+        it "should create new rows if not present, with one import command, and apply defaults" do
+          cache1 = expect_cache_creation
+          expect(cache1).to receive(:all_rows).once.and_return(:allrows)
+          allow(cache1).to receive(:loaded_at).once.and_return(12345)
+          expect_cache_validation(cache1, 12345, 2, false)
+
+          @instance.all_rows.should == :allrows
+
+          existing_row = double("existing_row")
+          cache_input = [
+            { 'foo' => 'bar', 'bar' => 'baz' },
+            { 'foo' => 'a', 'bar' => 'b' },
+            { 'foo' => 'c', 'bar' => 'yohoho' }
+          ]
+          cache_output = {
+            { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
+            { 'foo' => 'a', 'bar' => 'b' } => [ ],
+            { 'foo' => 'c', 'bar' => 'yohoho' } => [ ]
+          }
+
+          cache_1_input = [ ]
+          expect(cache1).to receive(:rows_matching).once { |*args| cache_1_input << args; cache_output }
+
+          cache2 = expect_cache_creation
+          cache_2_input = [ ]
+          expect(cache2).to receive(:rows_matching).once { |*args| cache_2_input << args; cache_output }
+
+          import_result = double("import_result")
+          expect(import_result).to receive(:failed_instances).and_return([ ])
+          import_args = [ ]
+          expect(@low_card_model).to receive(:import).once { |*args| import_args << args; import_result }
+
+          new_row_1 = double("new_row_1")
+          new_row_2 = double("new_row_2")
+          cache3 = expect_cache_creation
+          cache_3_input = [ ]
+          expect(cache3).to receive(:rows_matching).once do |*args|
+            cache_3_input << args
+
+            { { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
+              { 'foo' => 'a', 'bar' => 'b' } => [ new_row_1 ],
+              { 'foo' => 'c', 'bar' => 'yohoho' } => [ new_row_2 ] }
+          end
+
+          result = @instance.find_or_create_rows_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c' } ])
+          result.size.should == 3
+          result[{ :foo => 'bar', :bar => 'baz' }].should be(existing_row)
+          result[{ :foo => 'a', :bar => 'b' }].should be(new_row_1)
+          result[{ :foo => 'c' }].should be(new_row_2)
+
+          cache_1_input.length.should == 1
+          cache_1_input[0].length.should == 1
+          cache_1_input[0][0].length.should == 3
+          cache_1_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+          cache_1_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+          cache_1_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+          cache_2_input.length.should == 1
+          cache_2_input[0].length.should == 1
+          cache_2_input[0][0].length.should == 3
+          cache_2_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+          cache_2_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+          cache_2_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+          cache_3_input.length.should == 1
+          cache_3_input[0].length.should == 1
+          cache_3_input[0][0].length.should == 3
+          cache_3_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+          cache_3_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+          cache_3_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+          import_args.length.should == 1
+          import_args[0].length.should == 3
+          import_args[0][0].should == [ 'foo', 'bar' ]
+          import_args[0][1].length.should == 2
+          import_args[0][1].detect { |a| a == ['a', 'b'] }.should be
+          import_args[0][1].detect { |a| a == ['c', 'yohoho'] }.should be
+          import_args[0][2].should == { :validate => true }
+
+          @cache_flushes.length.should == 2
+
+          @cache_flushes[0][:reason].should == :creating_rows
+          @cache_flushes[0][:low_card_model].should be(@low_card_model)
+          @cache_flushes[0][:context].should == :before_import
+          @cache_flushes[0][:new_rows].length.should == 3
+          @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+          @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+          @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+
+          @cache_flushes[1][:reason].should == :creating_rows
+          @cache_flushes[1][:low_card_model].should be(@low_card_model)
+          @cache_flushes[1][:context].should == :after_import
+          @cache_flushes[1][:new_rows].length.should == 3
+          @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+          @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+          @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+
+          @rows_created.length.should == 1
+          @rows_created[0][:keys].should == %w{foo bar}
+          @rows_created[0][:low_card_model].should be(@low_card_model)
+          @rows_created[0][:values].length.should == 2
+          @rows_created[0][:values].detect { |e| e == %w{a b} }.should be
+          @rows_created[0][:values].detect { |e| e == %w{c yohoho} }.should be
+        end
       end
     end
 
@@ -599,116 +680,179 @@ describe LowCardTables::LowCardTable::RowManager do
         @instance.find_or_create_ids_for({ :foo => 'bar', :bar => 'baz' }).should be(123)
       end
 
-      it "should create new rows if not present, with one import command, and apply defaults" do
-        connection = double("connection")
-        allow(@low_card_model).to receive(:connection).and_return(connection)
-        allow(connection).to receive(:quote_table_name) { |tn| "<#{tn}>" }
-        connection_class = double("connection_class")
-        allow(connection_class).to receive(:name).and_return("some_postgresql_connection")
-        allow(connection).to receive(:class).and_return(connection_class)
-        allow(@low_card_model).to receive(:sanitize_sql).once.with([ "LOCK TABLE <thetablename>", { } ]).and_return("quoted-lock-tables")
+      context "with setup to actually run import" do
+        before :each do
+          connection = double("connection")
+          allow(@low_card_model).to receive(:connection).and_return(connection)
+          allow(connection).to receive(:quote_table_name) { |tn| "<#{tn}>" }
+          connection_class = double("connection_class")
+          allow(connection_class).to receive(:name).and_return("some_postgresql_connection")
+          allow(connection).to receive(:class).and_return(connection_class)
+          allow(@low_card_model).to receive(:sanitize_sql).once.with([ "LOCK TABLE <thetablename>", { } ]).and_return("quoted-lock-tables")
 
-        expect(@low_card_model).to receive(:transaction).once { |*args, &block| block.call }
-        expect(connection).to receive(:execute).once.with("quoted-lock-tables")
-
-        cache1 = expect_cache_creation
-        expect(cache1).to receive(:all_rows).once.and_return(:allrows)
-        allow(cache1).to receive(:loaded_at).once.and_return(12345)
-        expect_cache_validation(cache1, 12345, 2, false)
-
-        @instance.all_rows.should == :allrows
-
-        existing_row = double("existing_row")
-        allow(existing_row).to receive(:id).and_return(123)
-        cache_input = [
-          { 'foo' => 'bar', 'bar' => 'baz' },
-          { 'foo' => 'a', 'bar' => 'b' },
-          { 'foo' => 'c', 'bar' => 'yohoho' }
-        ]
-        cache_output = {
-          { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
-          { 'foo' => 'a', 'bar' => 'b' } => [ ],
-          { 'foo' => 'c', 'bar' => 'yohoho' } => [ ]
-        }
-
-        cache_1_input = [ ]
-        expect(cache1).to receive(:rows_matching).once { |*args| cache_1_input << args; cache_output }
-
-        cache2 = expect_cache_creation
-        cache_2_input = [ ]
-        expect(cache2).to receive(:rows_matching).once { |*args| cache_2_input << args; cache_output }
-
-        import_result = double("import_result")
-        expect(import_result).to receive(:failed_instances).and_return([ ])
-        import_args = [ ]
-        expect(@low_card_model).to receive(:import).once { |*args| import_args << args; import_result }
-
-        new_row_1 = double("new_row_1")
-        allow(new_row_1).to receive(:id).and_return(345)
-        new_row_2 = double("new_row_2")
-        allow(new_row_2).to receive(:id).and_return(567)
-        cache3 = expect_cache_creation
-        cache_3_input = [ ]
-        expect(cache3).to receive(:rows_matching).once do |*args|
-          cache_3_input << args
-
-          { { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
-            { 'foo' => 'a', 'bar' => 'b' } => [ new_row_1 ],
-            { 'foo' => 'c', 'bar' => 'yohoho' } => [ new_row_2 ] }
+          expect(@low_card_model).to receive(:transaction).once { |*args, &block| block.call }
+          expect(connection).to receive(:execute).once.with("quoted-lock-tables")
         end
 
-        result = @instance.find_or_create_ids_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c' } ])
-        result.size.should == 3
-        result[{ :foo => 'bar', :bar => 'baz' }].should be(123)
-        result[{ :foo => 'a', :bar => 'b' }].should be(345)
-        result[{ :foo => 'c' }].should be(567)
+        it "should raise a LowCardInvalidLowCardRowsError if the database refuses to import the rows with an exception" do
+          cache1 = expect_cache_creation
+          expect(cache1).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-        cache_1_input.length.should == 1
-        cache_1_input[0].length.should == 1
-        cache_1_input[0][0].length.should == 3
-        cache_1_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
-        cache_1_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
-        cache_1_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+          cache2 = expect_cache_creation
+          expect(cache2).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-        cache_2_input.length.should == 1
-        cache_2_input[0].length.should == 1
-        cache_2_input[0][0].length.should == 3
-        cache_2_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
-        cache_2_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
-        cache_2_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+          expect(@low_card_model).to receive(:import).once.and_raise(ActiveRecord::StatementInvalid)
 
-        cache_3_input.length.should == 1
-        cache_3_input[0].length.should == 1
-        cache_3_input[0][0].length.should == 3
-        cache_3_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
-        cache_3_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
-        cache_3_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+          exception = capture_exception { @instance.find_or_create_ids_for([ :foo => 'bar', :bar => 'baz' ]) }
+          exception.class.should == LowCardTables::Errors::LowCardInvalidLowCardRowsError
+          exception.message.should match(/thetablename/i)
+          exception.message.should match(/ActiveRecord::StatementInvalid/i)
+          exception.message.should match(/foo.*bar/i)
+          exception.message.should match(/bar.*baz/i)
 
-        import_args.length.should == 1
-        import_args[0].length.should == 3
-        import_args[0][0].should == [ 'foo', 'bar' ]
-        import_args[0][1].length.should == 2
-        import_args[0][1].detect { |a| a == ['a', 'b'] }.should be
-        import_args[0][1].detect { |a| a == ['c', 'yohoho'] }.should be
-        import_args[0][2].should == { :validate => true }
+          @rows_created.length.should == 0
+        end
 
-        @cache_flushes.length.should == 2
+        it "should raise a LowCardInvalidLowCardRowsError if the database refuses to import the rows with an import failure" do
+          cache1 = expect_cache_creation
+          expect(cache1).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-        @cache_flushes[0][:reason].should == :creating_rows
-        @cache_flushes[0][:low_card_model].should be(@low_card_model)
-        @cache_flushes[0][:context].should == :before_import
-        @cache_flushes[0][:new_rows].length.should == 3
-        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
-        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
-        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+          cache2 = expect_cache_creation
+          expect(cache2).to receive(:rows_matching).once.with([ 'foo' => 'bar', 'bar' => 'baz' ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
-        @cache_flushes[1][:reason].should == :creating_rows
-        @cache_flushes[1][:low_card_model].should be(@low_card_model)
-        @cache_flushes[1][:context].should == :after_import
-        @cache_flushes[1][:new_rows].length.should == 3
-        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
-        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
-        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+          failed_instance_1 = double("failed_instance_1")
+          errors_1 = double("errors_1")
+          allow(failed_instance_1).to receive(:errors).and_return(errors_1)
+          allow(errors_1).to receive(:full_messages).and_return(%w{error1a error1b error1c})
+
+          failed_instance_2 = double("failed_instance_2")
+          errors_2 = double("errors_2")
+          allow(failed_instance_2).to receive(:errors).and_return(errors_2)
+          allow(errors_2).to receive(:full_messages).and_return(%w{error2a error2b error2c})
+
+          import_result = double("import_result")
+          expect(import_result).to receive(:failed_instances).at_least(:once).and_return([ failed_instance_1, failed_instance_2 ])
+          expect(@low_card_model).to receive(:import).once.and_return(import_result)
+
+          exception = capture_exception { @instance.find_or_create_ids_for([ :foo => 'bar', :bar => 'baz' ]) }
+          exception.class.should == LowCardTables::Errors::LowCardInvalidLowCardRowsError
+          exception.message.should match(/thetablename/i)
+          exception.message.should match(/failed_instance_1/i)
+          exception.message.should match(/failed_instance_2/i)
+          exception.message.should match(/foo.*bar/i)
+          exception.message.should match(/error1a.*error1b.*error1c/i)
+          exception.message.should match(/error2a.*error2b.*error2c/i)
+
+          @rows_created.length.should == 0
+        end
+
+        it "should create new rows if not present, with one import command, and apply defaults" do
+          cache1 = expect_cache_creation
+          expect(cache1).to receive(:all_rows).once.and_return(:allrows)
+          allow(cache1).to receive(:loaded_at).once.and_return(12345)
+          expect_cache_validation(cache1, 12345, 2, false)
+
+          @instance.all_rows.should == :allrows
+
+          existing_row = double("existing_row")
+          allow(existing_row).to receive(:id).and_return(123)
+          cache_input = [
+            { 'foo' => 'bar', 'bar' => 'baz' },
+            { 'foo' => 'a', 'bar' => 'b' },
+            { 'foo' => 'c', 'bar' => 'yohoho' }
+          ]
+          cache_output = {
+            { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
+            { 'foo' => 'a', 'bar' => 'b' } => [ ],
+            { 'foo' => 'c', 'bar' => 'yohoho' } => [ ]
+          }
+
+          cache_1_input = [ ]
+          expect(cache1).to receive(:rows_matching).once { |*args| cache_1_input << args; cache_output }
+
+          cache2 = expect_cache_creation
+          cache_2_input = [ ]
+          expect(cache2).to receive(:rows_matching).once { |*args| cache_2_input << args; cache_output }
+
+          import_result = double("import_result")
+          expect(import_result).to receive(:failed_instances).and_return([ ])
+          import_args = [ ]
+          expect(@low_card_model).to receive(:import).once { |*args| import_args << args; import_result }
+
+          new_row_1 = double("new_row_1")
+          allow(new_row_1).to receive(:id).and_return(345)
+          new_row_2 = double("new_row_2")
+          allow(new_row_2).to receive(:id).and_return(567)
+          cache3 = expect_cache_creation
+          cache_3_input = [ ]
+          expect(cache3).to receive(:rows_matching).once do |*args|
+            cache_3_input << args
+
+            { { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
+              { 'foo' => 'a', 'bar' => 'b' } => [ new_row_1 ],
+              { 'foo' => 'c', 'bar' => 'yohoho' } => [ new_row_2 ] }
+          end
+
+          result = @instance.find_or_create_ids_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c' } ])
+          result.size.should == 3
+          result[{ :foo => 'bar', :bar => 'baz' }].should be(123)
+          result[{ :foo => 'a', :bar => 'b' }].should be(345)
+          result[{ :foo => 'c' }].should be(567)
+
+          cache_1_input.length.should == 1
+          cache_1_input[0].length.should == 1
+          cache_1_input[0][0].length.should == 3
+          cache_1_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+          cache_1_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+          cache_1_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+          cache_2_input.length.should == 1
+          cache_2_input[0].length.should == 1
+          cache_2_input[0][0].length.should == 3
+          cache_2_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+          cache_2_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+          cache_2_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+          cache_3_input.length.should == 1
+          cache_3_input[0].length.should == 1
+          cache_3_input[0][0].length.should == 3
+          cache_3_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+          cache_3_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+          cache_3_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+          import_args.length.should == 1
+          import_args[0].length.should == 3
+          import_args[0][0].should == [ 'foo', 'bar' ]
+          import_args[0][1].length.should == 2
+          import_args[0][1].detect { |a| a == ['a', 'b'] }.should be
+          import_args[0][1].detect { |a| a == ['c', 'yohoho'] }.should be
+          import_args[0][2].should == { :validate => true }
+
+          @cache_flushes.length.should == 2
+
+          @cache_flushes[0][:reason].should == :creating_rows
+          @cache_flushes[0][:low_card_model].should be(@low_card_model)
+          @cache_flushes[0][:context].should == :before_import
+          @cache_flushes[0][:new_rows].length.should == 3
+          @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+          @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+          @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+
+          @cache_flushes[1][:reason].should == :creating_rows
+          @cache_flushes[1][:low_card_model].should be(@low_card_model)
+          @cache_flushes[1][:context].should == :after_import
+          @cache_flushes[1][:new_rows].length.should == 3
+          @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+          @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+          @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+
+          @rows_created.length.should == 1
+          @rows_created[0][:keys].should == %w{foo bar}
+          @rows_created[0][:low_card_model].should be(@low_card_model)
+          @rows_created[0][:values].length.should == 2
+          @rows_created[0][:values].detect { |e| e == %w{a b} }.should be
+          @rows_created[0][:values].detect { |e| e == %w{c yohoho} }.should be
+        end
       end
     end
 
