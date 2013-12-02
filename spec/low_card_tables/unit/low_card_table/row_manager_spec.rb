@@ -579,5 +579,162 @@ describe LowCardTables::LowCardTable::RowManager do
         @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
       end
     end
+
+    describe "#find_or_create_ids_for" do
+      it "should require a complete Hash" do
+        lambda { @instance.find_or_create_ids_for({ :bar => 'baz' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotSpecifiedError)
+        lambda { @instance.find_or_create_ids_for({ :foo => 'bar', :quux => 'aa' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotPresentError)
+      end
+
+      it "should return a single ID if a single Hash is specified" do
+        row = double("row")
+        allow(row).to receive(:id).and_return(123)
+
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ row ])
+
+        @instance.find_or_create_ids_for({ :foo => 'bar', :bar => 'baz' }).should be(123)
+      end
+
+      it "should create new rows if not present, with one import command, and apply defaults" do
+        connection = double("connection")
+        allow(@low_card_model).to receive(:connection).and_return(connection)
+        allow(connection).to receive(:quote_table_name) { |tn| "<#{tn}>" }
+        connection_class = double("connection_class")
+        allow(connection_class).to receive(:name).and_return("some_postgresql_connection")
+        allow(connection).to receive(:class).and_return(connection_class)
+        allow(@low_card_model).to receive(:sanitize_sql).once.with([ "LOCK TABLE <thetablename>", { } ]).and_return("quoted-lock-tables")
+
+        expect(@low_card_model).to receive(:transaction).once { |*args, &block| block.call }
+        expect(connection).to receive(:execute).once.with("quoted-lock-tables")
+
+        cache1 = expect_cache_creation
+        expect(cache1).to receive(:all_rows).once.and_return(:allrows)
+        allow(cache1).to receive(:loaded_at).once.and_return(12345)
+        expect_cache_validation(cache1, 12345, 2, false)
+
+        @instance.all_rows.should == :allrows
+
+        existing_row = double("existing_row")
+        allow(existing_row).to receive(:id).and_return(123)
+        cache_input = [
+          { 'foo' => 'bar', 'bar' => 'baz' },
+          { 'foo' => 'a', 'bar' => 'b' },
+          { 'foo' => 'c', 'bar' => 'yohoho' }
+        ]
+        cache_output = {
+          { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
+          { 'foo' => 'a', 'bar' => 'b' } => [ ],
+          { 'foo' => 'c', 'bar' => 'yohoho' } => [ ]
+        }
+
+        cache_1_input = [ ]
+        expect(cache1).to receive(:rows_matching).once { |*args| cache_1_input << args; cache_output }
+
+        cache2 = expect_cache_creation
+        cache_2_input = [ ]
+        expect(cache2).to receive(:rows_matching).once { |*args| cache_2_input << args; cache_output }
+
+        import_result = double("import_result")
+        expect(import_result).to receive(:failed_instances).and_return([ ])
+        import_args = [ ]
+        expect(@low_card_model).to receive(:import).once { |*args| import_args << args; import_result }
+
+        new_row_1 = double("new_row_1")
+        allow(new_row_1).to receive(:id).and_return(345)
+        new_row_2 = double("new_row_2")
+        allow(new_row_2).to receive(:id).and_return(567)
+        cache3 = expect_cache_creation
+        cache_3_input = [ ]
+        expect(cache3).to receive(:rows_matching).once do |*args|
+          cache_3_input << args
+
+          { { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
+            { 'foo' => 'a', 'bar' => 'b' } => [ new_row_1 ],
+            { 'foo' => 'c', 'bar' => 'yohoho' } => [ new_row_2 ] }
+        end
+
+        result = @instance.find_or_create_ids_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c' } ])
+        result.size.should == 3
+        result[{ :foo => 'bar', :bar => 'baz' }].should be(123)
+        result[{ :foo => 'a', :bar => 'b' }].should be(345)
+        result[{ :foo => 'c' }].should be(567)
+
+        cache_1_input.length.should == 1
+        cache_1_input[0].length.should == 1
+        cache_1_input[0][0].length.should == 3
+        cache_1_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+        cache_1_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+        cache_1_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+        cache_2_input.length.should == 1
+        cache_2_input[0].length.should == 1
+        cache_2_input[0][0].length.should == 3
+        cache_2_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+        cache_2_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+        cache_2_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+        cache_3_input.length.should == 1
+        cache_3_input[0].length.should == 1
+        cache_3_input[0][0].length.should == 3
+        cache_3_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+        cache_3_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+        cache_3_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+        import_args.length.should == 1
+        import_args[0].length.should == 3
+        import_args[0][0].should == [ 'foo', 'bar' ]
+        import_args[0][1].length.should == 2
+        import_args[0][1].detect { |a| a == ['a', 'b'] }.should be
+        import_args[0][1].detect { |a| a == ['c', 'yohoho'] }.should be
+        import_args[0][2].should == { :validate => true }
+
+        @cache_flushes.length.should == 2
+
+        @cache_flushes[0][:reason].should == :creating_rows
+        @cache_flushes[0][:low_card_model].should be(@low_card_model)
+        @cache_flushes[0][:context].should == :before_import
+        @cache_flushes[0][:new_rows].length.should == 3
+        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+
+        @cache_flushes[1][:reason].should == :creating_rows
+        @cache_flushes[1][:low_card_model].should be(@low_card_model)
+        @cache_flushes[1][:context].should == :after_import
+        @cache_flushes[1][:new_rows].length.should == 3
+        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+      end
+    end
+
+    describe "#value_column_names" do
+      it "should return nothing if the table doesn't exist" do
+        allow(@low_card_model).to receive(:table_exists?).and_return(false)
+
+        @instance.value_column_names.should == [ ]
+      end
+
+      it "should exclude primary keys, created/updated_at, and options-specified column names" do
+        column_created_at = double("column_created_at")
+        allow(column_created_at).to receive(:primary).and_return(false)
+        allow(column_created_at).to receive(:name).and_return("created_at")
+
+        column_updated_at = double("column_updated_at")
+        allow(column_updated_at).to receive(:primary).and_return(false)
+        allow(column_updated_at).to receive(:name).and_return("updated_at")
+
+        column_skipped = double("column_skipped")
+        allow(column_skipped).to receive(:primary).and_return(false)
+        allow(column_skipped).to receive(:name).and_return("FooFle")
+
+        columns = [ @column_id, @column_foo, @column_bar, @column_created_at, @column_updated_at, @column_skipped ]
+
+        allow(@low_card_model).to receive(:low_card_options).and_return({ :exclude_column_names => :fooFLe })
+
+        @instance.value_column_names.should == %w{foo bar}
+      end
+    end
   end
 end

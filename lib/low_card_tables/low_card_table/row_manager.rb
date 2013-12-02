@@ -175,10 +175,19 @@ module LowCardTables
         row_map_to_id_map(find_rows_for(hash_hashes_object_or_objects))
       end
 
+      # Behaves identically to #find_or_create_rows_for, except that it returns IDs instead of rows.
       def find_or_create_ids_for(hash_hashes_object_or_objects)
         row_map_to_id_map(find_or_create_rows_for(hash_hashes_object_or_objects))
       end
 
+      # Returns the set of columns on the low-card table that we should consider "value columns" -- i.e., those that
+      # contain data values, rather than metadata, like the primary key, created_at/updated_at, and so on.
+      #
+      # Columns that are excluded:
+      #
+      # * The primary key
+      # * created_at and updated_at
+      # * Any additional columns specified using the +:exclude_column_names+ option when declaring +is_low_card_table+.
       def value_column_names
         value_columns.map(&:name)
       end
@@ -435,7 +444,7 @@ equivalent of 'LOCK TABLE'(s) in your database.}
       def column_names_to_skip
         @column_names_to_skip ||= begin
           COLUMN_NAMES_TO_ALWAYS_SKIP +
-          (@low_card_model.low_card_options[:exclude_column_names] || [ ]).map { |n| n.to_s.strip.downcase }
+          Array(@low_card_model.low_card_options[:exclude_column_names] || [ ]).map { |n| n.to_s.strip.downcase }
         end
       end
 
