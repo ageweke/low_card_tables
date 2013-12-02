@@ -158,10 +158,19 @@ module LowCardTables
         do_find_or_create(hash_hashes_object_or_objects, false)
       end
 
+      # Given a single Hash specifying values for every column in the low-card table, returns an instance of the
+      # low-card table for that combination of values. The row in question will be created if it doesn't already
+      # exist.
+      #
+      # Given an array of Hashes, each specifying values for every column in the low-card table, returns a Hash
+      # mapping each of those Hashes to an instance of the low-card table for that combination of values. Rows for
+      # any missing combinations of values will be created. (Creation is done in bulk, using +activerecord_import+,
+      # so this method will be fast no matter how many rows need to be created.)
       def find_or_create_rows_for(hash_hashes_object_or_objects)
         do_find_or_create(hash_hashes_object_or_objects, true)
       end
 
+      # Behaves identically to #find_rows_for, except that it returns IDs instead of rows.
       def find_ids_for(hash_hashes_object_or_objects)
         row_map_to_id_map(find_rows_for(hash_hashes_object_or_objects))
       end

@@ -341,8 +341,6 @@ describe LowCardTables::LowCardTable::RowManager do
       end
 
       it "should return nil if no rows match" do
-        row = double("row")
-
         cache = expect_cache_creation
         expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
 
@@ -386,6 +384,164 @@ describe LowCardTables::LowCardTable::RowManager do
 
         @instance.find_rows_for({ :foo => 'bar' }).should be(row)
       end
+    end
+
+    describe "#find_ids_for" do
+      it "should require a complete Hash" do
+        lambda { @instance.find_ids_for({ :bar => 'baz' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotSpecifiedError)
+        lambda { @instance.find_ids_for({ :foo => 'bar', :quux => 'aa' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotPresentError)
+      end
+
+      it "should return a single row if a single Hash is specified" do
+        row = double("row")
+        allow(row).to receive(:id).and_return(123)
+
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ row ])
+
+        @instance.find_ids_for({ :foo => 'bar', :bar => 'baz' }).should be(123)
+      end
+
+      it "should return nil if no rows match" do
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
+
+        @instance.find_ids_for({ :foo => 'bar', :bar => 'baz' }).should == nil
+      end
+
+      it "should return a Hash if multiple Hashes are specified" do
+        row1 = double("row1")
+        allow(row1).to receive(:id).and_return(123)
+        row2 = double("row2")
+        allow(row2).to receive(:id).and_return(345)
+
+        cache = expect_cache_creation
+        rows_matching_args = [ ]
+        expect(cache).to receive(:rows_matching).once do |*args|
+          rows_matching_args << args
+          { { 'foo' => 'bar', 'bar' => 'baz' } => [ row1 ],
+            { 'foo' => 'a', 'bar' => 'b' } => [ row2 ],
+            { 'foo' => 'c', 'bar' => 'd' } => [ ] }
+        end
+
+        @instance.find_ids_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c', :bar => 'd'} ]).should == {
+          { :foo => 'bar', :bar => 'baz' } => 123,
+          { :foo => 'a', :bar => 'b' } => 345,
+          { :foo => 'c', :bar => 'd' } => nil }
+
+        rows_matching_args.length.should == 1
+        call_1 = rows_matching_args[0]
+        call_1.length.should == 1
+        input_array = call_1[0]
+        input_array.length.should == 3
+
+        input_array.detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+        input_array.detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+        input_array.detect { |e| e == { 'foo' => 'c', 'bar' => 'd' } }.should be
+      end
+
+      it "should fill in default values correctly" do
+        row = double("row")
+        allow(row).to receive(:id).and_return(123)
+
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'yohoho' } ]).and_return({ 'foo' => 'bar', 'bar' => 'yohoho' } => [ row ])
+
+        @instance.find_ids_for({ :foo => 'bar' }).should be(123)
+      end
+    end
+
+    describe "#find_or_create_rows_for" do
+      it "should require a complete Hash" do
+        lambda { @instance.find_or_create_rows_for({ :bar => 'baz' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotSpecifiedError)
+        lambda { @instance.find_or_create_rows_for({ :foo => 'bar', :quux => 'aa' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotPresentError)
+      end
+
+      it "should return a single row if a single Hash is specified" do
+        row = double("row")
+
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ row ])
+
+        @instance.find_or_create_rows_for({ :foo => 'bar', :bar => 'baz' }).should be(row)
+      end
+
+      it "should create a row if there isn't one already" do
+        connection = double("connection")
+        allow(@low_card_model).to receive(:connection).and_return(connection)
+        allow(connection).to receive(:quote_table_name) { |tn| "<#{tn}>" }
+        connection_class = double("connection_class")
+        allow(connection_class).to receive(:name).and_return("some_postgresql_connection")
+        allow(connection).to receive(:class).and_return(connection_class)
+        allow(@low_card_model).to receive(:sanitize_sql).once.with([ "LOCK TABLE <thetablename>", { } ]).and_return("quoted-lock-tables")
+
+        expect(@low_card_model).to receive(:transaction).once { |*args, &block| block.call }
+        expect(connection).to receive(:execute).once.with("quoted-lock-tables")
+
+        cache1 = expect_cache_creation
+        expect(cache1).to receive(:all_rows).once.and_return(:allrows)
+        allow(cache1).to receive(:loaded_at).once.and_return(12345)
+        expect_cache_validation(cache1, 12345, 2, false)
+
+        @instance.all_rows.should == :allrows
+
+        expect(cache1).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
+        cache2 = expect_cache_creation
+        expect(cache2).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
+
+        import_result = double("import_result")
+        expect(import_result).to receive(:failed_instances).and_return([ ])
+        expect(@low_card_model).to receive(:import).once.with([ "foo", "bar" ], [["bar", "baz"]], { :validate => true }).and_return(import_result)
+
+        new_row = double("new_row")
+        cache3 = expect_cache_creation
+        expect(cache3).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ new_row ])
+
+        @instance.find_or_create_rows_for({ :foo => 'bar', :bar => 'baz' }).should be(new_row)
+
+        @cache_flushes.length.should == 2
+        @cache_flushes[0].should == { :reason => :creating_rows, :low_card_model => @low_card_model, :context => :before_import, :new_rows => [{ "foo" => "bar", "bar" => "baz"}]}
+      end
+
+=begin
+      it "should return a Hash if multiple Hashes are specified" do
+        row1 = double("row1")
+        row2 = double("row2")
+
+        cache = expect_cache_creation
+        rows_matching_args = [ ]
+        expect(cache).to receive(:rows_matching).once do |*args|
+          rows_matching_args << args
+          { { 'foo' => 'bar', 'bar' => 'baz' } => [ row1 ],
+            { 'foo' => 'a', 'bar' => 'b' } => [ row2 ],
+            { 'foo' => 'c', 'bar' => 'd' } => [ ] }
+        end
+
+        @instance.find_or_create_rows_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c', :bar => 'd'} ]).should == {
+          { :foo => 'bar', :bar => 'baz' } => row1,
+          { :foo => 'a', :bar => 'b' } => row2,
+          { :foo => 'c', :bar => 'd' } => nil }
+
+        rows_matching_args.length.should == 1
+        call_1 = rows_matching_args[0]
+        call_1.length.should == 1
+        input_array = call_1[0]
+        input_array.length.should == 3
+
+        input_array.detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+        input_array.detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+        input_array.detect { |e| e == { 'foo' => 'c', 'bar' => 'd' } }.should be
+      end
+
+      it "should fill in default values correctly" do
+        row = double("row")
+
+        cache = expect_cache_creation
+        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'yohoho' } ]).and_return({ 'foo' => 'bar', 'bar' => 'yohoho' } => [ row ])
+
+        @instance.find_or_create_rows_for({ :foo => 'bar' }).should be(row)
+      end
+=end
     end
   end
 end
