@@ -1,5 +1,9 @@
 require 'low_card_tables'
 
+# Note: later on in this spec, there's a bunch of unexpected madness -- it looks like we're going well out of our way
+# to validate arguments to methods in a roundabout way, using Array#detect and so on, instead of just setting
+# expectations. But we're doing this for a very good reason: we can't guarantee order of arguments to a number of
+# methods since Ruby < 1.9 doesn't guarantee hash order.
 describe LowCardTables::LowCardTable::RowManager do
   def klass
     LowCardTables::LowCardTable::RowManager
@@ -466,7 +470,7 @@ describe LowCardTables::LowCardTable::RowManager do
         @instance.find_or_create_rows_for({ :foo => 'bar', :bar => 'baz' }).should be(row)
       end
 
-      it "should create a row if there isn't one already" do
+      it "should create new rows if not present, with one import command, and apply defaults" do
         connection = double("connection")
         allow(@low_card_model).to receive(:connection).and_return(connection)
         allow(connection).to receive(:quote_table_name) { |tn| "<#{tn}>" }
@@ -485,63 +489,95 @@ describe LowCardTables::LowCardTable::RowManager do
 
         @instance.all_rows.should == :allrows
 
-        expect(cache1).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
+        existing_row = double("existing_row")
+        cache_input = [
+          { 'foo' => 'bar', 'bar' => 'baz' },
+          { 'foo' => 'a', 'bar' => 'b' },
+          { 'foo' => 'c', 'bar' => 'yohoho' }
+        ]
+        cache_output = {
+          { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
+          { 'foo' => 'a', 'bar' => 'b' } => [ ],
+          { 'foo' => 'c', 'bar' => 'yohoho' } => [ ]
+        }
+
+        cache_1_input = [ ]
+        expect(cache1).to receive(:rows_matching).once { |*args| cache_1_input << args; cache_output }
+
         cache2 = expect_cache_creation
-        expect(cache2).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ ])
+        cache_2_input = [ ]
+        expect(cache2).to receive(:rows_matching).once { |*args| cache_2_input << args; cache_output }
 
         import_result = double("import_result")
         expect(import_result).to receive(:failed_instances).and_return([ ])
-        expect(@low_card_model).to receive(:import).once.with([ "foo", "bar" ], [["bar", "baz"]], { :validate => true }).and_return(import_result)
+        import_args = [ ]
+        expect(@low_card_model).to receive(:import).once { |*args| import_args << args; import_result }
 
-        new_row = double("new_row")
+        new_row_1 = double("new_row_1")
+        new_row_2 = double("new_row_2")
         cache3 = expect_cache_creation
-        expect(cache3).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'baz' } ]).and_return({ 'foo' => 'bar', 'bar' => 'baz' } => [ new_row ])
+        cache_3_input = [ ]
+        expect(cache3).to receive(:rows_matching).once do |*args|
+          cache_3_input << args
 
-        @instance.find_or_create_rows_for({ :foo => 'bar', :bar => 'baz' }).should be(new_row)
-
-        @cache_flushes.length.should == 2
-        @cache_flushes[0].should == { :reason => :creating_rows, :low_card_model => @low_card_model, :context => :before_import, :new_rows => [{ "foo" => "bar", "bar" => "baz"}]}
-      end
-
-=begin
-      it "should return a Hash if multiple Hashes are specified" do
-        row1 = double("row1")
-        row2 = double("row2")
-
-        cache = expect_cache_creation
-        rows_matching_args = [ ]
-        expect(cache).to receive(:rows_matching).once do |*args|
-          rows_matching_args << args
-          { { 'foo' => 'bar', 'bar' => 'baz' } => [ row1 ],
-            { 'foo' => 'a', 'bar' => 'b' } => [ row2 ],
-            { 'foo' => 'c', 'bar' => 'd' } => [ ] }
+          { { 'foo' => 'bar', 'bar' => 'baz' } => [ existing_row ],
+            { 'foo' => 'a', 'bar' => 'b' } => [ new_row_1 ],
+            { 'foo' => 'c', 'bar' => 'yohoho' } => [ new_row_2 ] }
         end
 
-        @instance.find_or_create_rows_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c', :bar => 'd'} ]).should == {
-          { :foo => 'bar', :bar => 'baz' } => row1,
-          { :foo => 'a', :bar => 'b' } => row2,
-          { :foo => 'c', :bar => 'd' } => nil }
+        result = @instance.find_or_create_rows_for([ { :foo => 'bar', :bar => 'baz' }, { :foo => 'a', :bar => 'b' }, { :foo => 'c' } ])
+        result.size.should == 3
+        result[{ :foo => 'bar', :bar => 'baz' }].should be(existing_row)
+        result[{ :foo => 'a', :bar => 'b' }].should be(new_row_1)
+        result[{ :foo => 'c' }].should be(new_row_2)
 
-        rows_matching_args.length.should == 1
-        call_1 = rows_matching_args[0]
-        call_1.length.should == 1
-        input_array = call_1[0]
-        input_array.length.should == 3
+        cache_1_input.length.should == 1
+        cache_1_input[0].length.should == 1
+        cache_1_input[0][0].length.should == 3
+        cache_1_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+        cache_1_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+        cache_1_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
 
-        input_array.detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
-        input_array.detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
-        input_array.detect { |e| e == { 'foo' => 'c', 'bar' => 'd' } }.should be
+        cache_2_input.length.should == 1
+        cache_2_input[0].length.should == 1
+        cache_2_input[0][0].length.should == 3
+        cache_2_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+        cache_2_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+        cache_2_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+        cache_3_input.length.should == 1
+        cache_3_input[0].length.should == 1
+        cache_3_input[0][0].length.should == 3
+        cache_3_input[0][0].detect { |x| x == { 'foo' => 'bar', 'bar' => 'baz' }}.should be
+        cache_3_input[0][0].detect { |x| x == { 'foo' => 'a', 'bar' => 'b' }}.should be
+        cache_3_input[0][0].detect { |x| x == { 'foo' => 'c', 'bar' => 'yohoho' }}.should be
+
+        import_args.length.should == 1
+        import_args[0].length.should == 3
+        import_args[0][0].should == [ 'foo', 'bar' ]
+        import_args[0][1].length.should == 2
+        import_args[0][1].detect { |a| a == ['a', 'b'] }.should be
+        import_args[0][1].detect { |a| a == ['c', 'yohoho'] }.should be
+        import_args[0][2].should == { :validate => true }
+
+        @cache_flushes.length.should == 2
+
+        @cache_flushes[0][:reason].should == :creating_rows
+        @cache_flushes[0][:low_card_model].should be(@low_card_model)
+        @cache_flushes[0][:context].should == :before_import
+        @cache_flushes[0][:new_rows].length.should == 3
+        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+        @cache_flushes[0][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
+
+        @cache_flushes[1][:reason].should == :creating_rows
+        @cache_flushes[1][:low_card_model].should be(@low_card_model)
+        @cache_flushes[1][:context].should == :after_import
+        @cache_flushes[1][:new_rows].length.should == 3
+        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'bar', 'bar' => 'baz' } }.should be
+        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'a', 'bar' => 'b' } }.should be
+        @cache_flushes[1][:new_rows].detect { |e| e == { 'foo' => 'c', 'bar' => 'yohoho' } }.should be
       end
-
-      it "should fill in default values correctly" do
-        row = double("row")
-
-        cache = expect_cache_creation
-        expect(cache).to receive(:rows_matching).once.with([ { 'foo' => 'bar', 'bar' => 'yohoho' } ]).and_return({ 'foo' => 'bar', 'bar' => 'yohoho' } => [ row ])
-
-        @instance.find_or_create_rows_for({ :foo => 'bar' }).should be(row)
-      end
-=end
     end
   end
 end
