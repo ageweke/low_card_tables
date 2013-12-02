@@ -32,7 +32,6 @@ module LowCardTables
 
         if config[:config][:adapter] == 'sqlite3'
           sqlite_version = ::ActiveRecord::Base.connection.send(:sqlite_version).instance_variable_get("@version").inspect rescue "unknown"
-          $stderr.puts "SQLite Version: #{sqlite_version}"
         end
       end
 
