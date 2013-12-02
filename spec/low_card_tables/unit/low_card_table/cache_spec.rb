@@ -88,9 +88,13 @@ describe LowCardTables::LowCardTable::Cache do
       end
 
       it "should return a Hash if given an array of Hashes" do
-        h1 = { :a => :b, :c => :d }
-        h2 = { :foo => :bar }
-        h3 = { :bar => :baz }
+        h1_orig = { :a => :b, :c => :d }
+        h2_orig = { :foo => :bar }
+        h3_orig = { :bar => :baz }
+
+        h1 = h1_orig.with_indifferent_access
+        h2 = h2_orig.with_indifferent_access
+        h3 = h3_orig.with_indifferent_access
 
         expect(@row1).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(true)
         expect(@row1).to receive(:_low_card_row_matches_any_hash?).once.with([ h2 ]).and_return(true)
@@ -102,43 +106,45 @@ describe LowCardTables::LowCardTable::Cache do
         expect(@row3).to receive(:_low_card_row_matches_any_hash?).once.with([ h2 ]).and_return(false)
         expect(@row3).to receive(:_low_card_row_matches_any_hash?).once.with([ h3 ]).and_return(false)
 
-        result = @cache.rows_matching([ h1, h2, h3 ])
+        result = @cache.rows_matching([ h1_orig, h2_orig, h3_orig ])
         result.class.should == Hash
         result.size.should == 3
 
-        result[h1].length.should == 1
-        result[h1][0].should be(@row1)
+        result[h1_orig].length.should == 1
+        result[h1_orig][0].should be(@row1)
 
-        result[h2].length.should == 2
-        result[h2].sort_by(&:object_id).should == [ @row1, @row2 ].sort_by(&:object_id)
+        result[h2_orig].length.should == 2
+        result[h2_orig].sort_by(&:object_id).should == [ @row1, @row2 ].sort_by(&:object_id)
 
-        result[h3].class.should == Array
-        result[h3].length.should == 0
+        result[h3_orig].class.should == Array
+        result[h3_orig].length.should == 0
       end
 
       it "should return a Hash if given an array of just one Hash" do
-        h1 = { :a => :b, :c => :d }
+        h1_orig = { :a => :b, :c => :d }
+        h1 = h1_orig.with_indifferent_access
 
         expect(@row1).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(true)
         expect(@row2).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(false)
         expect(@row3).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(false)
 
-        result = @cache.rows_matching([ h1 ])
+        result = @cache.rows_matching([ h1_orig ])
         result.class.should == Hash
         result.size.should == 1
 
-        result[h1].length.should == 1
-        result[h1][0].should be(@row1)
+        result[h1_orig].length.should == 1
+        result[h1_orig][0].should be(@row1)
       end
 
       it "should return an Array if given a Hash" do
-        h1 = { :a => :b, :c => :d }
+        h1_orig = { :a => :b, :c => :d }
+        h1 = h1_orig.with_indifferent_access
 
         expect(@row1).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(true)
         expect(@row2).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(false)
         expect(@row3).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(true)
 
-        result = @cache.rows_matching(h1)
+        result = @cache.rows_matching(h1_orig)
         result.class.should == Array
         result.sort_by(&:object_id).should == [ @row1, @row3 ].sort_by(&:object_id)
       end
@@ -174,9 +180,13 @@ describe LowCardTables::LowCardTable::Cache do
       end
 
       it "should return a Hash if given an array of Hashes" do
-        h1 = { :a => :b, :c => :d }
-        h2 = { :foo => :bar }
-        h3 = { :bar => :baz }
+        h1_orig = { :a => :b, :c => :d }
+        h2_orig = { :foo => :bar }
+        h3_orig = { :bar => :baz }
+
+        h1 = h1_orig.with_indifferent_access
+        h2 = h2_orig.with_indifferent_access
+        h3 = h3_orig.with_indifferent_access
 
         expect(@row1).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(true)
         expect(@row1).to receive(:_low_card_row_matches_any_hash?).once.with([ h2 ]).and_return(true)
@@ -188,43 +198,45 @@ describe LowCardTables::LowCardTable::Cache do
         expect(@row3).to receive(:_low_card_row_matches_any_hash?).once.with([ h2 ]).and_return(false)
         expect(@row3).to receive(:_low_card_row_matches_any_hash?).once.with([ h3 ]).and_return(false)
 
-        result = @cache.ids_matching([ h1, h2, h3 ])
+        result = @cache.ids_matching([ h1_orig, h2_orig, h3_orig ])
         result.class.should == Hash
         result.size.should == 3
 
-        result[h1].length.should == 1
-        result[h1][0].should == @row1.id
+        result[h1_orig].length.should == 1
+        result[h1_orig][0].should == @row1.id
 
-        result[h2].length.should == 2
-        result[h2].sort.should == [ @row1.id, @row2.id ].sort
+        result[h2_orig].length.should == 2
+        result[h2_orig].sort.should == [ @row1.id, @row2.id ].sort
 
-        result[h3].class.should == Array
-        result[h3].length.should == 0
+        result[h3_orig].class.should == Array
+        result[h3_orig].length.should == 0
       end
 
       it "should return a Hash if given an array of just one Hash" do
-        h1 = { :a => :b, :c => :d }
+        h1_orig = { :a => :b, :c => :d }
+        h1 = h1_orig.with_indifferent_access
 
         expect(@row1).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(true)
         expect(@row2).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(false)
         expect(@row3).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(false)
 
-        result = @cache.ids_matching([ h1 ])
+        result = @cache.ids_matching([ h1_orig ])
         result.class.should == Hash
         result.size.should == 1
 
-        result[h1].length.should == 1
-        result[h1][0].should == @row1.id
+        result[h1_orig].length.should == 1
+        result[h1_orig][0].should == @row1.id
       end
 
       it "should return an Array if given a Hash" do
-        h1 = { :a => :b, :c => :d }
+        h1_orig = { :a => :b, :c => :d }
+        h1 = h1_orig.with_indifferent_access
 
         expect(@row1).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(true)
         expect(@row2).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(false)
         expect(@row3).to receive(:_low_card_row_matches_any_hash?).once.with([ h1 ]).and_return(true)
 
-        result = @cache.ids_matching(h1)
+        result = @cache.ids_matching(h1_orig)
         result.class.should == Array
         result.sort.should == [ @row1.id, @row3.id ].sort
       end

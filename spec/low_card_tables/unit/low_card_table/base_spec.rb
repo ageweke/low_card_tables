@@ -40,6 +40,10 @@ describe LowCardTables::LowCardTable::Base do
         @instance._low_card_row_matches_hash?(:foo => :bar).should_not be
       end
 
+      it "should always match if the hash contains nothing" do
+        @instance._low_card_row_matches_hash?({ }).should be
+      end
+
       it "should match a set of hashes, by looking for one that matches, by calling through to _low_card_row_matches_hash?" do
         h1 = { :foo => :bar, :bar => :baz }
         h2 = { :a => :b, 'c' => 12345 }

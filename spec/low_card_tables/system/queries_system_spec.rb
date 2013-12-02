@@ -35,7 +35,7 @@ describe "LowCardTables query support" do
   end
 
   def check_user_ids(users, expected_users)
-    users.map(&:id).sort.should == expected_users.map(&:id).sort
+    users.to_a.map(&:id).sort.should == expected_users.to_a.map(&:id).sort
   end
 
   it "should allow 'where' clauses that use the association name" do

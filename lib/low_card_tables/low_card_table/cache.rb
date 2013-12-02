@@ -130,7 +130,7 @@ module LowCardTables
 
           @rows_by_id.each do |id,r|
             hashes.each do |h|
-              out[h] << r if r._low_card_row_matches_any_hash?([ h ])
+              out[h] << r if r._low_card_row_matches_any_hash?([ h.with_indifferent_access ])
             end
           end
 

@@ -14,6 +14,43 @@ module LowCardTables
     # The TableUniqueIndex is responsible for maintaining the unique index across all columns in the table, and
     # the RowCollapser handles the case where rows need to be collapsed (unified) because a column was removed from
     # the low-card table.
+    #
+    # === Cache Notifications
+    #
+    # This class uses the ActiveSupport::Notifications interface to notify anyone who's interested of cache-related
+    # events. In particular, it fires the following events with the following payloads:
+    #
+    # [low_card_tables.cache_load] <tt>{ :low_card_model => <ActiveRecord model class> }</tt>; this is fired when
+    #                              the cache is loaded from the database, whether that's the first time after startup
+    #                              or after a cache flush.
+    # [low_card_tables.cache_flush] <tt>{ :low_card_model => <ActiveRecord model class>, :reason => <some reason> }</tt>;
+    #                               this is fired when there's a cache that is flushed. Additional payload depends on
+    #                               the +:reason+.
+    #
+    # Reasons for +low_card_tables.cache_flush+ include:
+    #
+    # [:manually_requested] You called +low_card_flush_cache!+ on the low-card model.
+    # [:id_not_found] You requested a low-card row by ID, and we didn't find that ID in the cache. We assume that the ID
+    #                 is likely valid and that it's simply been created since we retrieved the cache from the database,
+    #                 so we flush the cache and try again. +:ids+ is present in the payload, mapping to an array of
+    #                 one or more IDs -- the ID or IDs that weren't found in the cache.
+    # [:collapse_rows_and_update_referrers] The low-card table has been migrated and has had a column removed; we've
+    #                                       collapsed any now-duplicate rows properly. As such, we need to flush the
+    #                                       cache.
+    # [:schema_change] We have detected that the schema of the low-card table has changed, and need to flush the cache.
+    # [:creating_rows] We're about to create one or more new rows in the low-card table, because a set of attributes
+    #                  that has never been seen before was asked for. Before we actually go try to create them, we
+    #                  lock the table and flush the cache, so that, in the case where some other process has already
+    #                  created them, we simply pick them up now. Then, after we create them, we flush the cache again
+    #                  to pick up the newly-created rows. +:context+ is present in the payload, mapped to either
+    #                  +:before_import+ or +:after_import+ (corresponding to the two situations above). +:new_rows+ is
+    #                  also present in the payload, mapped to an array of one or more Hashes, each of which represents
+    #                  a unique combination of attributes to be created.
+    # [:stale] By far the most common case -- the cache is simply stale based upon the current cache-expiration policy,
+    #          and needs to be reloaded. The payload will contain +:loaded+, which is the time that the cache was
+    #          loaded, and +:now+, which is the time at which the cache was checked for validity. (+:now+ will always
+    #          be very close to, but not after, the current time; any delay is just due to the time it took to
+    #          receive the notification via ActiveSupport::Notifications.)
     class RowManager
       attr_reader :low_card_model
 
@@ -56,10 +93,14 @@ module LowCardTables
         cache.all_rows
       end
 
+      # Flushes the cache immediately (assuming we have any cached data at all).
       def flush_cache!
         flush!(:manually_requested)
       end
 
+      # Given a single primary-key ID of a low-card row, returns the row for that ID. Given an Array of one or more
+      # primary-key IDs, returns a Hash mapping each of those IDs to the corresponding row. Properly flushes the cache
+      # and tries again if given an ID that doesn't exist in cache.
       def rows_for_ids(id_or_ids)
         begin
           cache.rows_for_ids(id_or_ids)
@@ -69,18 +110,50 @@ module LowCardTables
         end
       end
 
+      # A synonym for #rows_for_ids.
       def row_for_id(id)
         rows_for_ids(id)
       end
 
+      # Given a single Hash specifying zero or more constraints for low-card rows (i.e., mapping zero or more columns
+      # of the low-card table to specific values for those columns), returns a (possibly empty) Array of IDs of
+      # low-card rows that match those constraints.
+      #
+      # Given an array of one or more Hashes, each of which specify zero or more constraints for low-card rows, returns
+      # a Hash mapping each of those Hashes to a (possibly empty) Array of IDs of low-card rows that match each
+      # Hash.
+      #
+      # Given a block (in which case no hashes may be passed), returns an Array of IDs of low-card rows that match the
+      # block. The block is passed an instance of the low-card model class, and the return value of the block (truthy
+      # or falsy) determines whether the ID of that row is included in the return value or not.
       def ids_matching(hash_or_hashes = nil, &block)
         do_matching(hash_or_hashes, block, :ids_matching)
       end
 
+      # Given a single Hash specifying zero or more constraints for low-card rows (i.e., mapping zero or more columns
+      # of the low-card table to specific values for those columns), returns a (possibly empty) Array of
+      # low-card rows that match those constraints.
+      #
+      # Given an array of one or more Hashes, each of which specify zero or more constraints for low-card rows, returns
+      # a Hash mapping each of those Hashes to a (possibly empty) Array of low-card rows that match each
+      # Hash.
+      #
+      # Given a block (in which case no hashes may be passed), returns an Array of low-card rows that match the
+      # block. The block is passed an instance of the low-card model class, and the return value of the block (truthy
+      # or falsy) determines whether that row is included in the return value or not.
       def rows_matching(hash_or_hashes = nil, &block)
         do_matching(hash_or_hashes, block, :rows_matching)
       end
 
+      # Given a single Hash specifying values for every column in the low-card table, returns an instance of the
+      # low-card table, already existing in the database, for that combination of values.
+      #
+      # Given an array of Hashes, each specifying values for every column in the low-card table, returns a Hash
+      # mapping each of those Hashes to an instance of the low-card table, already existing in the database, for that
+      # combination of values.
+      #
+      # If you request an instance for a combination of values that doesn't exist in the table, it will simply be
+      # mapped to +nil+. Under no circumstances will rows be added to the database.
       def find_rows_for(hash_hashes_object_or_objects)
         do_find_or_create(hash_hashes_object_or_objects, false)
       end
@@ -138,13 +211,20 @@ module LowCardTables
       COLUMN_NAMES_TO_ALWAYS_SKIP = %w{created_at updated_at}
 
       def do_matching(hash_or_hashes, block, method_name)
-        hashes = to_array_of_partial_hashes(hash_or_hashes)
-
-        begin
-          cache.send(method_name, hash_or_hashes, &block)
+        result = begin
+          hashes = to_array_of_partial_hashes(hash_or_hashes)
+          cache.send(method_name, hashes, &block)
         rescue LowCardTables::Errors::LowCardColumnNotPresentError => lccnpe
           flush!(:schema_change)
-          cache.send(method_name, hash_or_hashes, &block)
+          hashes = to_array_of_partial_hashes(hash_or_hashes)
+          cache.send(method_name, hashes, &block)
+        end
+
+        if hash_or_hashes.kind_of?(Array)
+          result
+        else
+          raise "We passed in #{hash_or_hashes.inspect}, but got back #{result.inspect}?" unless result.kind_of?(Hash) && result.size <= 1
+          result.values[0] if result.size > 0
         end
       end
 
@@ -413,11 +493,15 @@ equivalent of 'LOCK TABLE'(s) in your database.}
 
       def to_array_of_partial_hashes(array)
         array = if array.kind_of?(Array) then array else [ array ] end
-        array.map do |hash|
-          out = hash.with_indifferent_access
-          assert_partial_key!(out)
-          out
-        end
+        array.each { |h| assert_partial_key!(h) }
+        array
+
+        # array.map do |hash|
+        #   out = hash
+        #   out = hash.with_indifferent_access
+        #   assert_partial_key!(out)
+        #   out
+        # end
       end
 
       def assert_partial_key!(hash)

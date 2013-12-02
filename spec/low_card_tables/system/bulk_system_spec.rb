@@ -130,6 +130,78 @@ describe "LowCardTables bulk operations" do
       end
     end
 
+    context "with a table with defaults" do
+      before :each do
+        migrate do
+          drop_table :lctables_spec_bulk_defaults rescue nil
+          create_table :lctables_spec_bulk_defaults do |t|
+            t.boolean :deleted, :null => false
+            t.string :gender, :null => false, :default => 'female'
+            t.integer :donation_level, :default => 10
+          end
+
+          add_index :lctables_spec_bulk_defaults, [ :deleted, :gender, :donation_level ], :unique => true, :name => 'index_lctables_spec_bulk_defaults_on_all'
+
+          drop_table :lctables_spec_users_defaults rescue nil
+          create_table :lctables_spec_users_defaults do |t|
+            t.string :name, :null => false
+            t.integer :user_status_id, :null => false, :limit => 2
+          end
+        end
+
+        define_model_class(:UserStatusBulkDefaults, :lctables_spec_bulk_defaults) { is_low_card_table }
+        define_model_class(:UserBulkDefaults, :lctables_spec_users_defaults) { has_low_card_table :status, :class => 'UserStatusBulkDefaults', :foreign_key => :user_status_id }
+      end
+
+      after :each do
+        migrate do
+          drop_table :lctables_spec_bulk_defaults rescue nil
+        end
+      end
+
+      it "should fill in missing values in the hashes with defaults when finding rows" do
+        u1 = ::UserBulkDefaults.new
+        u1.name = 'User 1'
+        u1.deleted = false
+        u1.save!
+
+        u1.name.should == 'User 1'
+        u1.deleted.should == false
+        u1.gender.should == 'female'
+        u1.donation_level.should == 10
+
+        u2 = ::UserBulkDefaults.new
+        u2.name = 'User 2'
+        u2.deleted = false
+        u2.gender = 'female'
+        u2.donation_level = 8
+        u2.save!
+
+        status_id_1 = u1.user_status_id
+        status_id_1.should be
+        status_row_1 = ::UserStatusBulkDefaults.find(status_id_1)
+
+        status_id_2 = u2.user_status_id
+        status_id_2.should be
+        status_row_2 = ::UserStatusBulkDefaults.find(status_id_2)
+
+        lambda { ::UserStatusBulkDefaults.low_card_find_rows_for({ :gender => 'female' }) }.should raise_error(LowCardTables::Errors::LowCardColumnNotSpecifiedError)
+        ::UserStatusBulkDefaults.low_card_find_rows_for({ :deleted => false }).should == status_row_1
+        ::UserStatusBulkDefaults.low_card_find_rows_for({ :deleted => false, :donation_level => 8 }).should == status_row_2
+      end
+
+      it "should fill in missing values in the hashes with defaults when creating rows" do
+        row = ::UserStatusBulkDefaults.low_card_find_or_create_rows_for({ :deleted => false })
+        row.should be
+        row.id.should be
+        row.id.should > 0
+
+        row.deleted.should == false
+        row.gender.should == 'female'
+        row.donation_level.should == 10
+      end
+    end
+
     it "should allow for bulk retrieval of rows by IDs" do
       ensure_zero_database_calls do
         results = ::UserStatus.low_card_rows_for_ids([ @hash1_id, @hash3_id ])
