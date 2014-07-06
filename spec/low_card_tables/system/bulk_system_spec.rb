@@ -156,6 +156,7 @@ describe "LowCardTables bulk operations" do
       after :each do
         migrate do
           drop_table :lctables_spec_bulk_defaults rescue nil
+          drop_table :lctables_spec_users_defaults rescue nil
         end
       end
 

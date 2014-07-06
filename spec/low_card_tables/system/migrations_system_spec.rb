@@ -592,6 +592,13 @@ describe "LowCardTables migration support" do
         ::ActiveSupport::Notifications.subscribe('sql.active_record', @collector)
       end
 
+      after :each do
+        migrate do
+          drop_table :lctables_spec_admins rescue nil
+          drop_table :lctables_spec_guests rescue nil
+        end
+      end
+
       it "should not attempt to update any associated tables if a column is removed and told not to, but should still collapse IDs (#{remove_column_type})" do
         tn = @table_name
 
