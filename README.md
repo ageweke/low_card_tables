@@ -6,7 +6,11 @@ future expansion, separate analysis, and other (non-Rails) tools than actual bit
 has few distinct values in the table; boolean fields are one example, but any `enum`-style fields are great candidates
 for use.
 
-Greatly improve scalability and maintainability of your database tables by breaking out columns containing few distinct values (e.g., booleans and other flags) into a separate table that's transparently referenced and used. Supports Rails 3.0.x, 3.1.x, 3.2.x, and 4.0.x, running on Ruby 1.8.7, 1.9.3, and 2.0.0 with MySQL, PostgreSQL, and Sqlite. (JRuby is supported, but only with MySQL, because `low_card_tables` depends on the `activerecord-import` gem, and it currently does not have JRuby support for anything but MySQL.) Adding support for other databases is trivial.
+Combined with [`flex_columns`](https://github.com/ageweke/flex_columns), allows a RDBMS to represent a wide
+variety of data efficiently and with a great deal of flexibility &mdash; build your projects rapidly and effectively
+while relying on the most reliable, manageable, proven data engines out there.
+
+Greatly improve scalability and maintainability of your database tables by breaking out columns containing few distinct values (e.g., booleans and other flags) into a separate table that's transparently referenced and used. Supports Rails 3.0.x, 3.1.x, 3.2.x, 4.0.x, and 4.1.x, running on Ruby 1.8.7, 1.9.3, 2.0.0, and 2.1.2 with MySQL, PostgreSQL, and Sqlite. (JRuby is supported, but only with MySQL, because `low_card_tables` depends on the `activerecord-import` gem, and it currently does not have JRuby support for anything but MySQL.) Adding support for other databases is trivial.
 
 `low_card_tables` is the successor to similar, but more primitive, systems that have been in place at very large commercial websites serving tens of millions of pages a day, and in database tables with hundreds of millions of rows. The predecessor systems were extremely successful and reliable &mdash; hence the desire to evolve this into an open-source gem.
 
