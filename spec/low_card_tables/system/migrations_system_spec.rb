@@ -108,6 +108,71 @@ describe "LowCardTables migration support" do
     @user3_again.respond_to?(:donation_level=).should_not be
   end
 
+  it "should not fail if a low-card table or column doesn't exist (presumably because it hasn't been migrated in yet)" do
+    tn = @table_name
+    migrate do
+      drop_table tn rescue nil
+
+      drop_table :lctables_spec_users rescue nil
+      create_table :lctables_spec_users do |t|
+        t.string :name, :null => false
+      end
+    end
+
+    define_model_class(:UserStatus, @table_name) { is_low_card_table }
+    define_model_class(:User, :lctables_spec_users) { has_low_card_table :status }
+
+    user1 = ::User.create!(:name => 'User1')
+    user1_again = ::User.find(user1.id)
+
+    user1_again.name.should == user1.name
+  end
+
+  it "should allow you to migrate in a low-card table and column and then everything should work" do
+    tn = @table_name
+    migrate do
+      drop_table tn rescue nil
+
+      drop_table :lctables_spec_users rescue nil
+      create_table :lctables_spec_users do |t|
+        t.string :name, :null => false
+      end
+    end
+
+    define_model_class(:UserStatus, @table_name) { is_low_card_table }
+    define_model_class(:User, :lctables_spec_users) { has_low_card_table :status }
+
+    user1 = ::User.create!(:name => 'User1')
+    user1_again = ::User.find(user1.id)
+
+    user1_again.name.should == user1.name
+
+    migrate do
+      create_table tn, :low_card => true do |t|
+        t.boolean :deleted, :null => false
+        t.boolean :deceased
+        t.string :gender, :null => false
+        t.integer :donation_level
+      end
+
+      add_column :lctables_spec_users, :user_status_id, :integer, :limit => 2
+    end
+
+    ::User.reset_column_information
+
+    user2 = ::User.create!(:name => 'User2', :deleted => false, :deceased => true, :gender => 'something', :donation_level => 4)
+    user2.deleted.should == false
+    user2.deceased.should == true
+    user2.gender.should == 'something'
+    user2.donation_level.should == 4
+
+    user2_again = ::User.find(user2.id)
+    user2_again.deleted.should == false
+    user2_again.deceased.should == true
+    user2_again.gender.should == 'something'
+    user2_again.donation_level.should == 4
+  end
+
   it "should automatically add a unique index in migrations if explicitly told it's a low-card table" do
     tn = @table_name
     migrate do

@@ -61,21 +61,6 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
       end
     end
 
-    it "should fail instantiation if the foreign key specified isn't a column" do
-      lambda do
-        LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :foobar,
-          { :class => ModelClassNameAscName, :foreign_key => :bogus_id })
-      end.should raise_error(ArgumentError, /bogus_id/i)
-    end
-
-    it "should fail instantiation if the foreign key inferred isn't a column" do
-      allow(@col3).to receive(:name).and_return("whatever")
-      lambda do
-        LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :foobar,
-          { :class => ModelClassNameAscName })
-      end.should raise_error(ArgumentError, /model_class_name_foobar_id/i)
-    end
-
     it "should fail instantiation if the class inferred can't be found" do
       allow(@col3).to receive(:name).and_return("model_class_name_yohoho_id")
       lambda do
@@ -116,6 +101,22 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
       lambda do
         LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :yohoho, { :class => klass })
       end.should raise_error(ArgumentError, /is_low_card_table/i)
+    end
+  end
+
+  describe "#foreign_key_column_exists?" do
+    it "should return false if the column doesn't exist" do
+      class ModelClassNameFoobar; end
+      allow(ModelClassNameFoobar).to receive(:is_low_card_table?).and_return(true)
+      expect(ModelClassNameFoobar).to receive(:low_card_referred_to_by).once.with(@model_class)
+      instance = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :foobar, { })
+      expect(instance.foreign_key_column_exists?).to eq(false)
+    end
+
+    it "should return true if the column does exist" do
+      expect(ModelClassNameAscName).to receive(:low_card_referred_to_by).once.with(@model_class)
+      instance = LowCardTables::HasLowCardTable::LowCardAssociation.new(@model_class, :asc_name, { })
+      expect(instance.foreign_key_column_exists?).to eq(true)
     end
   end
 

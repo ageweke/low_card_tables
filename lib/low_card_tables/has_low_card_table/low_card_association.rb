@@ -111,17 +111,13 @@ module LowCardTables
 
           out = out.to_s if out.kind_of?(Symbol)
 
-          column = model_class.columns.detect { |c| c.name.strip.downcase == out.strip.downcase }
-          unless column
-            raise ArgumentError, %{You said that #{model_class} has_low_card_table :#{association_name}, and we
-have a foreign-key column name of #{out.inspect}, but #{model_class} doesn't seem
-to have a column named that at all. Did you misspell it? Or perhaps something else is wrong?
-
-The model class has these columns: #{model_class.columns.map(&:name).sort.join(", ")}}
-          end
-
           out
         end
+      end
+
+      # Does the foreign-key column we have defined actually exist on this class?
+      def foreign_key_column_exists?
+        !! model_class.columns.detect { |c| c.name.strip.downcase == foreign_key_column_name.strip.downcase }
       end
 
       # When a low-card table has a column removed, it will typically have duplicate rows; these duplicate rows are
@@ -148,6 +144,8 @@ The model class has these columns: #{model_class.columns.map(&:name).sort.join("
       # LowCardTables::HasLowCardTable::Base#low_card_update_foreign_keys!, which is primarily invoked by a
       # +:before_save+ filter and alternatively can be invoked manually.
       def update_foreign_key!(model_instance)
+        return unless foreign_key_column_exists?
+
         hash = { }
 
         low_card_object = model_instance._low_card_objects_manager.object_for(self)
