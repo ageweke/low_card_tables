@@ -59,6 +59,18 @@ describe "LowCardTables migration support" do
     end
   end
 
+  it "should not blow up if there's an ActiveRecord subclass around that has no table name" do
+    define_model_class(:TableWithoutName, nil) { }
+
+    migrate do
+      create_table :non_low_card_table do |t|
+        t.string :name
+      end
+
+      drop_table :non_low_card_table
+    end
+  end
+
   it "should handle schema changes to the low-card table" do
     tn = @table_name
     migrate do

@@ -80,16 +80,16 @@ describe LowCardTables::ActiveRecord::Migrations do
 
     context "with mock low-card model" do
       before :each do
-        non_low_card_class = Object.new
+        @non_low_card_class = Object.new
         @low_card_class = Object.new
 
-        expect(non_low_card_class).to receive(:table_name).and_return('bar')
-        expect(@low_card_class).to receive(:table_name).and_return('foo')
+        allow(@non_low_card_class).to receive(:table_name).and_return('bar')
+        allow(@low_card_class).to receive(:table_name).and_return('foo')
 
         expect(@low_card_class).to receive(:is_low_card_table?).and_return(true)
         expect(@low_card_class).to receive(:name).at_least(:once).and_return('Whatever')
 
-        expect(::ActiveRecord::Base).to receive(:descendants).and_return([ non_low_card_class, @low_card_class ])
+        expect(::ActiveRecord::Base).to receive(:descendants).and_return([ @non_low_card_class, @low_card_class ])
       end
 
       %w{add_column remove_column create_table change_table}.each do |method_name|
@@ -125,6 +125,22 @@ describe LowCardTables::ActiveRecord::Migrations do
               out.pop if out[-1].size == 0
             end
             out
+          end
+
+          it "should not fail if there's an ActiveRecord subclass around with no table_name" do
+            allow(@non_low_card_class).to receive(:table_name).and_return(nil)
+
+            expect(@low_card_class).to receive(:low_card_remove_unique_index!).once.ordered
+
+            expect(@low_card_class).to receive(:reset_column_information).at_least(2).times.ordered
+            expect(@low_card_class).to receive(:low_card_value_column_names).twice.ordered.and_return([ 'x', 'y' ])
+
+            expect(LowCardTables::VersionSupport).to receive(:clear_schema_cache!).once.ordered.with(@low_card_class)
+
+            expect(@low_card_class).to receive(:low_card_ensure_has_unique_index!).once.with(true).ordered
+
+            @migration.send(@method, *@args, &@proc)
+            @migration.calls.should == [ { :name => @method, :args => @args, :block => @proc } ]
           end
 
           it "should call #eager_load, pick up an AR descendant properly, and enforce the index" do

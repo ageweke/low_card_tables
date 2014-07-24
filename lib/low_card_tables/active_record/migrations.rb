@@ -210,7 +210,8 @@ module LowCardTables
           # Make sure we load all models
           ::Rails.application.eager_load! if defined?(::Rails) && ::Rails.respond_to?(:application) && ::Rails.application && ::Rails.application.respond_to?(:eager_load!)
           out = ::ActiveRecord::Base.descendants.detect do |klass|
-            klass.table_name.strip.downcase == table_name.to_s.strip.downcase &&
+            klass.table_name &&
+              klass.table_name.strip.downcase == table_name.to_s.strip.downcase &&
               klass.is_low_card_table? &&
               klass.name && klass.name.strip.length > 0
           end
