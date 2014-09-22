@@ -105,7 +105,7 @@ module LowCardTables
 
           unless out
             out = "#{@model_class.name.underscore}_#{association_name}"
-            out = $1 if out =~ %r{/[^/]+$}i
+            out = $1 if out =~ %r{/([^/]+)$}i
             out = out + "_id"
           end
 

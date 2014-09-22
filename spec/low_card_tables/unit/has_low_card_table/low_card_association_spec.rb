@@ -61,6 +61,29 @@ describe LowCardTables::HasLowCardTable::LowCardAssociation do
       end
     end
 
+    it "should correctly infer the foreign_key_column_name when using a namespaced model class" do
+      module ::LowCardSpecNamespace10; end
+      class ::LowCardSpecNamespace10::McNameAscName; end
+
+      allow(::LowCardSpecNamespace10::McNameAscName).to receive(:is_low_card_table?).and_return(true)
+
+      namespaced_model_class = Class.new
+      allow(namespaced_model_class).to receive(:name).and_return('LowCardSpecNamespace10::McName')
+
+      col1 = double("column_1")
+      allow(col1).to receive(:name).and_return("id")
+      col2 = double("column_2")
+      allow(col2).to receive(:name).and_return("name")
+
+      allow(namespaced_model_class).to receive(:columns).and_return([ col1, col2 ])
+
+      expect(::LowCardSpecNamespace10::McNameAscName).to receive(:low_card_referred_to_by).once.with(namespaced_model_class)
+
+      association = LowCardTables::HasLowCardTable::LowCardAssociation.new(namespaced_model_class, :asc_name, { })
+
+      expect(association.foreign_key_column_name).to eq("mc_name_asc_name_id")
+    end
+
     it "should fail instantiation if the class inferred can't be found" do
       allow(@col3).to receive(:name).and_return("model_class_name_yohoho_id")
       lambda do
