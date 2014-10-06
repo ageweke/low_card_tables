@@ -2,7 +2,7 @@ require 'low_card_tables'
 
 describe LowCardTables::HasLowCardTable::LowCardDynamicMethodManager do
   before :each do
-    @model_class = double("model_class")
+    @model_class = double("model_class", :superclass => ::Object)
     @lcam = double("low_card_associations_manager")
     allow(@model_class).to receive(:_low_card_associations_manager).and_return(@lcam)
 

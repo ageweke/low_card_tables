@@ -32,7 +32,11 @@ module LowCardTables
 
         method_data = @method_delegation_map[method_name.to_s]
         unless method_data
-          raise NameError, "Whoa -- we're trying to call a delegated low-card method #{method_name.inspect} on #{object}, of class #{object.class}, but somehow the LowCardDynamicMethodManager has no knowledge of that method?!? We know about: #{@method_delegation_map.keys.sort.inspect}"
+          if superclass_low_card_dynamic_method_manager
+            return superclass_low_card_dynamic_method_manager.run_low_card_method(object, method_name, args)
+          else
+            raise NameError, "Whoa -- we're trying to call a delegated low-card method #{method_name.inspect} on #{object}, of class #{object.class}, but somehow the LowCardDynamicMethodManager has no knowledge of that method?!? We know about: #{@method_delegation_map.keys.sort.inspect}"
+          end
         end
 
         (association, association_method_name) = method_data
@@ -190,6 +194,20 @@ yourself, using #{association.low_card_class.name}#ids_matching.}
       # Returns all associations that should be used for this object.
       def associations
         @model_class._low_card_associations_manager.associations
+      end
+
+      # Returns the LowCardDynamicMethodManager for the model class's superclass, if there is one. This is used for
+      # supporting STI.
+      def superclass_low_card_dynamic_method_manager
+        @superclass_low_card_dynamic_method_manager ||= begin
+          model_superclass = @model_class.superclass
+          if model_superclass.respond_to?(:_low_card_dynamic_method_manager)
+            model_superclass._low_card_dynamic_method_manager
+          else
+            :none
+          end
+        end
+        @superclass_low_card_dynamic_method_manager unless @superclass_low_card_dynamic_method_manager == :none
       end
 
       # Makes sure the given object is an instance of the class we're handling dynamic methods for.

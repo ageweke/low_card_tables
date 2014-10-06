@@ -1,5 +1,9 @@
 # `low_card_tables` Changelog
 
+## 1.0.4,
+
+* Fixed issues where you couldn't use `low_card_tables` with an ActiveRecord class that was at anything but the leaf of a [single-table inheritance](http://api.rubyonrails.org/classes/ActiveRecord/Base.html#label-Single+table+inheritance) hierarchy.
+
 ## 1.0.3, 2014-09-22
 
 * Fixed an issue where, if a table that owned a low-card table was declared a namespace (_e.g._, `module Foo; class Bar < ActiveRecord::Base; has_low_card_table :status; end; end`), the call to `has_low_card_table` would fail with an error (trying to call `+` on `nil`).

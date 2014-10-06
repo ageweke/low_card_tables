@@ -60,7 +60,9 @@ module LowCardTables
 
       # Just like _low_card_association, but returns nil when an association is not found, rather than raising an error.
       def maybe_low_card_association(name)
-        @associations.detect { |a| a.association_name.to_s.strip.downcase == name.to_s.strip.downcase }
+        out = @associations.detect { |a| a.association_name.to_s.strip.downcase == name.to_s.strip.downcase }
+        out ||= superclass_low_card_associations_manager.maybe_low_card_association(name) if superclass_low_card_associations_manager
+        out
       end
 
       # Updates all foreign keys that the given model_instance has to their correct values, given the set of attributes
@@ -70,6 +72,10 @@ module LowCardTables
 
         @associations.each do |association|
           association.update_foreign_key!(model_instance)
+        end
+
+        if superclass_low_card_associations_manager
+          superclass_low_card_associations_manager.low_card_update_foreign_keys!(model_instance)
         end
       end
 
@@ -119,6 +125,20 @@ module LowCardTables
         unless model_instance.kind_of?(@model_class)
           raise ArgumentError, %{Somehow, you passed #{model_instance}, an instance of #{model_instance.class}, to the LowCardAssociationsManager for #{@model_class}.}
         end
+      end
+
+      # Returns the LowCardAssociationsManager for the model class's superclass, if there is one. This is used for
+      # supporting STI.
+      def superclass_low_card_associations_manager
+        @superclass_low_card_associations_manager ||= begin
+          model_superclass = @model_class.superclass
+          if model_superclass.respond_to?(:_low_card_associations_manager)
+            model_superclass._low_card_associations_manager
+          else
+            :none
+          end
+        end
+        @superclass_low_card_associations_manager unless @superclass_low_card_associations_manager == :none
       end
 
       # Installs any methods we need on the model class -- right now, this is just our +before_save+ hook.
