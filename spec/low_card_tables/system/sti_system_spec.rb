@@ -58,6 +58,14 @@ describe "LowCardTables STI support" do
       expect(account2_again.deleted).to eq(true)
       expect(account2_again.account_level).to eq(20)
 
+      all_accounts = ::Account.all.to_a
+      expect(all_accounts.length).to eq(2)
+      account1 = all_accounts.detect { |a| a.id == account1.id }
+      account2 = all_accounts.detect { |a| a.id == account2.id }
+
+      expect(account1.class.name).to eq('Account')
+      expect(account2.class.name).to eq('AdminAccount')
+
       expect(::AccountStatusBackdoor.count).to eq(2)
       asid = account1.account_status_id
       status1 = ::AccountStatusBackdoor.find(asid)
