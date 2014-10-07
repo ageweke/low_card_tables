@@ -70,7 +70,7 @@ describe "LowCardTables STI support" do
       asid = account1.account_status_id
       status1 = ::AccountStatusBackdoor.find(asid)
       expect(status1.deleted).to eq(false)
-      expect(status1.type).to eq('Account')
+      expect(status1.type).to eq(nil)
       expect(status1.account_level).to eq(10)
       status2 = ::AccountStatusBackdoor.find(account2.account_status_id)
       expect(status2.deleted).to eq(true)

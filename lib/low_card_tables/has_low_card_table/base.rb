@@ -62,8 +62,11 @@ module LowCardTables
 
       def ensure_proper_type
         if (assn = self.class.association_for_inheritance_column)
-          lco = send(assn.association_name)
-          lco.send(:write_attribute, self.class.inheritance_column, self.class.sti_name)
+          superclass = self.class.superclass
+          unless (superclass == ::ActiveRecord::Base) || (superclass.abstract_class?)
+            lco = send(assn.association_name)
+            lco.send(:write_attribute, self.class.inheritance_column, self.class.sti_name)
+          end
         else
           super
         end
