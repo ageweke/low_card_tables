@@ -60,6 +60,15 @@ module LowCardTables
       extend ActiveSupport::Concern
 
 
+      def ensure_proper_type
+        if (assn = self.class.association_for_inheritance_column)
+          lco = send(assn.association_name)
+          lco.send(:write_attribute, self.class.inheritance_column, self.class.sti_name)
+        else
+          super
+        end
+      end
+
       module ClassMethods
         # Several methods go straight to the LowCardAssociationsManager.
         delegate :has_low_card_table, :_low_card_association, :_low_card_update_collapsed_rows, :low_card_value_collapsing_update_scheme, :to => :_low_card_associations_manager
@@ -68,6 +77,31 @@ module LowCardTables
         # a class is if that class has declared has_low_card_table to at least one table.
         def has_any_low_card_tables?
           true
+        end
+
+        def association_for_inheritance_column
+          _low_card_associations_manager.association_containing_method_named(inheritance_column)
+        end
+
+        def discriminate_class_for_record(record)
+          if (! record[inheritance_column])
+            association = association_for_inheritance_column
+            if association
+              foreign_key = record[association.foreign_key_column_name]
+              low_card_row = association.low_card_class.low_card_row_for_id(foreign_key)
+              type = low_card_row.send(inheritance_column)
+
+              if type
+                find_sti_class(type)
+              else
+                super
+              end
+            else
+              super
+            end
+          else
+            super
+          end
         end
 
         # The LowCardAssociationsManager keeps track of which low-card tables this table refers to; see its

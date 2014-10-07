@@ -3,6 +3,7 @@ require 'low_card_tables'
 describe LowCardTables::LowCardTable::Base do
   before :each do
     @test_class = Class.new
+    allow(@test_class).to receive(:inheritance_column=).with('_sti_on_low_card_tables_should_never_be_used')
     @test_class.send(:include, LowCardTables::LowCardTable::Base)
   end
 
@@ -112,6 +113,7 @@ describe LowCardTables::LowCardTable::Base do
       end
 
       test_class = Class.new
+      allow(test_class).to receive(:inheritance_column=).with('_sti_on_low_card_tables_should_never_be_used')
       test_class.send(:extend, mod)
       test_class.send(:include, LowCardTables::LowCardTable::Base)
 
@@ -163,6 +165,7 @@ ensure_has_unique_index! remove_unique_index!}.each do |method_name|
 
       # We need a new class -- because we need to make sure our module gets in there first
       @test_class = Class.new
+      allow(@test_class).to receive(:inheritance_column=).with('_sti_on_low_card_tables_should_never_be_used')
       @test_class.send(:include, @save_mod)
       @test_class.send(:include, LowCardTables::LowCardTable::Base)
 

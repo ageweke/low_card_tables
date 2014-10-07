@@ -22,6 +22,10 @@ module LowCardTables
         @method_delegation_map = { }
       end
 
+      def contains_method?(method_name)
+        !! @method_delegation_map[method_name.to_s]
+      end
+
       # Given an instance of the model class we're maintaining methods for, the name of a method to invoke, and
       # arguments passed to that method, runs the correct method. This is therefore a dispatcher -- rather than attempt
       # to define the methods on the _low_card_dynamic_methods_module at all times to directly call the right low-card

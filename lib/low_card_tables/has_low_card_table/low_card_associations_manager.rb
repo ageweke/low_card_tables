@@ -45,6 +45,13 @@ module LowCardTables
         @model_class._low_card_dynamic_method_manager.sync_methods!
       end
 
+      def association_containing_method_named(method_name)
+        out = @associations.detect do |low_card_association|
+          low_card_association.class_method_name_to_low_card_method_name_map[method_name]
+        end
+        out || superclass_low_card_associations_manager.try(:association_containing_method_named, method_name)
+      end
+
       # Called when someone has called ::ActiveRecord::Base#reset_column_information on the low-card model in question.
       # This simply tells the LowCardDynamicMethodManager to sync the methods on this model class, thus updating the
       # set of delegated methods to match the new columns.
@@ -119,14 +126,6 @@ module LowCardTables
         end
       end
 
-      private
-      # Makes sure that +model_instance+ is an instance of the model class this LowCardAssociationsManager is for.
-      def ensure_correct_class!(model_instance)
-        unless model_instance.kind_of?(@model_class)
-          raise ArgumentError, %{Somehow, you passed #{model_instance}, an instance of #{model_instance.class}, to the LowCardAssociationsManager for #{@model_class}.}
-        end
-      end
-
       # Returns the LowCardAssociationsManager for the model class's superclass, if there is one. This is used for
       # supporting STI.
       def superclass_low_card_associations_manager
@@ -139,6 +138,14 @@ module LowCardTables
           end
         end
         @superclass_low_card_associations_manager unless @superclass_low_card_associations_manager == :none
+      end
+
+      private
+      # Makes sure that +model_instance+ is an instance of the model class this LowCardAssociationsManager is for.
+      def ensure_correct_class!(model_instance)
+        unless model_instance.kind_of?(@model_class)
+          raise ArgumentError, %{Somehow, you passed #{model_instance}, an instance of #{model_instance.class}, to the LowCardAssociationsManager for #{@model_class}.}
+        end
       end
 
       # Installs any methods we need on the model class -- right now, this is just our +before_save+ hook.

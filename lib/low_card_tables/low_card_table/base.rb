@@ -19,6 +19,7 @@ module LowCardTables
       # Set up cache-policy inheritance -- see HasCacheExpiration for more details.
       included do
         low_card_cache_policy_inherits_from ::LowCardTables
+        self.inheritance_column = '_sti_on_low_card_tables_should_never_be_used'
       end
 
       # This method is a critical entry point from the rest of the low-card system. For example, given our usual

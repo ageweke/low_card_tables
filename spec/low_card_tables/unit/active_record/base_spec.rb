@@ -4,6 +4,7 @@ describe LowCardTables::ActiveRecord::Base do
   before :each do
     @klass = Class.new
     @klass.send(:include, LowCardTables::ActiveRecord::Base)
+    allow(@klass).to receive(:inheritance_column=).with('_sti_on_low_card_tables_should_never_be_used')
   end
 
   it "should include LowCardTables::LowCardTable::Base appropriately and respond to #is_low_card_table? appropriately" do

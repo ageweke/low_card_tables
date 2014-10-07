@@ -2,6 +2,7 @@
 
 ## 1.0.4,
 
+* The [single-table inheritance](http://api.rubyonrails.org/classes/ActiveRecord/Base.html#label-Single+table+inheritance) type-discrimination column &mdash; by default called `type` &mdash; can now be part of a low-cardinality table itself. This elegantly allows you to use STI without consuming the very large amounts of space required by Rails' default implementation, where it stores the name of the class in every single row.
 * Fixed issues where you couldn't use `low_card_tables` with an ActiveRecord class that was at anything but the leaf of a [single-table inheritance](http://api.rubyonrails.org/classes/ActiveRecord/Base.html#label-Single+table+inheritance) hierarchy.
 
 ## 1.0.3, 2014-09-22
