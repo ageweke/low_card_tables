@@ -22,10 +22,6 @@ module LowCardTables
         @method_delegation_map = { }
       end
 
-      def contains_method?(method_name)
-        !! @method_delegation_map[method_name.to_s]
-      end
-
       # Given an instance of the model class we're maintaining methods for, the name of a method to invoke, and
       # arguments passed to that method, runs the correct method. This is therefore a dispatcher -- rather than attempt
       # to define the methods on the _low_card_dynamic_methods_module at all times to directly call the right low-card
@@ -61,6 +57,18 @@ module LowCardTables
         end
       end
 
+      # Returns the effective association and method that we delegate the given method to. This is very close to
+      # identical to @method_delegation_map; the only difference is that it delegates to the +model_class+'s superclass
+      # as appropriate, too.
+      def effective_method_delegation_for(method_name)
+        method_name = method_name.to_s
+        out = @method_delegation_map[method_name]
+        if (! out) && superclass_low_card_dynamic_method_manager
+          out = superclass_low_card_dynamic_method_manager.effective_method_delegation_for(method_name)
+        end
+        out
+      end
+
       # Given a base ::ActiveRecord::Relation scope (which can of course just be a model class itself), and a set of
       # query constraints as passed into ::ActiveRecord::Relation#where (which must be a Hash -- for the other forms
       # of #where, our override of ::ActiveRecord::Relation#where doesn't call this method but just passes through to
@@ -91,7 +99,7 @@ module LowCardTables
         #   to that association; the constraints in the Hash use key names that are the actual low-card column names
         #   (i.e., we translate them from whatever delegated method names were present in the referring class)
         query_hash.each do |query_key, query_value|
-          low_card_delegation = @method_delegation_map[query_key.to_s]
+          low_card_delegation = effective_method_delegation_for(query_key)
 
           # Does this constraint even mention a low-card column or association name?
           if low_card_delegation

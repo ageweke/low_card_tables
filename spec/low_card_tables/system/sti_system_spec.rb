@@ -167,6 +167,8 @@ describe "LowCardTables STI support" do
       status2 = ::AccountStatusBackdoor.find(account2.account_status_id)
       expect(status2.deleted).to eq(true)
       expect(status2.account_level).to eq(20)
+
+      expect(::AdminAccount.where(:deleted => true).first.id).to eq(account2.id)
     end
   end
 end

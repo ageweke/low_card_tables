@@ -23,6 +23,10 @@ module LowCardTables
         (::ActiveRecord::VERSION::MAJOR <= 3 && ::ActiveRecord::VERSION::MINOR == 0)
       end
 
+      def sti_uses_discriminate_class_for_record?
+        ::ActiveRecord::VERSION::MAJOR >= 4
+      end
+
       # Define a default scope on the class in question. This is only actually used from our specs.
       def define_default_scope(klass, conditions)
         if default_scopes_accept_a_block?

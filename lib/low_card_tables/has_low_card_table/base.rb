@@ -86,7 +86,7 @@ module LowCardTables
           _low_card_associations_manager.association_containing_method_named(inheritance_column)
         end
 
-        def discriminate_class_for_record(record)
+        def discriminate_class_for_record(record, call_super = true)
           if (! record[inheritance_column])
             association = association_for_inheritance_column
             if association
@@ -94,16 +94,51 @@ module LowCardTables
               low_card_row = association.low_card_class.low_card_row_for_id(foreign_key)
               type = low_card_row.send(inheritance_column)
 
-              if type
-                find_sti_class(type)
+              return _low_card_find_sti_class(type) if type
+            end
+          end
+
+          super(record) if call_super
+        end
+
+        if ::LowCardTables::VersionSupport.sti_uses_discriminate_class_for_record?
+          def _low_card_find_sti_class(type)
+            find_sti_class(type)
+          end
+        else
+          def _low_card_find_sti_class(type_name)
+            return self if type_name.blank?
+
+            begin
+              if store_full_sti_class
+                ActiveSupport::Dependencies.constantize(type_name)
               else
-                super
+                compute_type(type_name)
               end
+            rescue NameError
+              raise SubclassNotFound,
+                "The single-table inheritance mechanism failed to locate the subclass: '#{type_name}'. " +
+                "This error is raised because the column '#{inheritance_column}' is reserved for storing the class in case of inheritance. " +
+                "Please rename this column if you didn't intend it to be used for storing the inheritance class " +
+                "or overwrite #{name}.inheritance_column to use another column for that information."
+            end
+          end
+
+          def instantiate(record)
+            sti_class = discriminate_class_for_record(record, false)
+            if sti_class
+              record_id = sti_class.primary_key && record[sti_class.primary_key]
+
+              if ::ActiveRecord::IdentityMap.enabled? && record_id
+                instance = use_identity_map(sti_class, record_id, record)
+              else
+                instance = sti_class.allocate.init_with('attributes' => record)
+              end
+
+              instance
             else
               super
             end
-          else
-            super
           end
         end
 
