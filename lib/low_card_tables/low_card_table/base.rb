@@ -58,7 +58,25 @@ module LowCardTables
       # instead of #_low_card_row_matches_any_hash? or #_low_card_row_matches_hash?, if its semantics work better for
       # your purposes, since its behavior will affect those methods as well.
       def _low_card_column_matches?(key, value)
-        self[key.to_s] == value
+        my_value = self[key.to_s]
+
+        if value.kind_of?(Array)
+          if my_value && my_value.kind_of?(Symbol)
+            my_value = my_value.to_s
+          end
+
+          value = value.map { |m| if m.kind_of?(Symbol) then m.to_s else m end }
+          value.include?(my_value)
+        else
+          value_sym = value.kind_of?(Symbol)
+          my_value_sym = my_value.kind_of?(Symbol)
+
+          if (value_sym != my_value_sym) && value && my_value
+            my_value.to_s.eql?(value.to_s)
+          else
+            my_value.eql?(value)
+          end
+        end
       end
 
       # This method is called from methods like #low_card_rows_matching, when passed a block -- its job is simply to

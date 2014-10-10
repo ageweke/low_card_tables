@@ -55,6 +55,17 @@ describe "LowCardTables query support" do
     check_user_ids(::User.where(:deleted => false, :name => 'User2'), [ ])
   end
 
+  it "should allow 'where' clauses that use an array" do
+    check_user_ids(::User.where(:donation_level => [ 8, 10 ]), [ @user1, @user2, @user3, @user4, @user5 ])
+  end
+
+  it "should allow 'where' clauses to use a symbol or a string, and work fine either way" do
+    check_user_ids(::User.where(:gender => :male), [ @user4 ])
+    check_user_ids(::User.where(:gender => 'male'), [ @user4 ])
+    check_user_ids(::User.where(:gender => [ :male, :female ]), [ @user1, @user2, @user3, @user4, @user5 ])
+    check_user_ids(::User.where(:gender => [ 'male', 'female' ]), [ @user1, @user2, @user3, @user4, @user5 ])
+  end
+
   it "should allow 'where' clauses that use delegated properties with differently-prefixed names directly" do
     define_model_class(:User2, :lctables_spec_users) { has_low_card_table :status, :prefix => :foo, :class => ::UserStatus, :foreign_key => :user_status_id }
 
