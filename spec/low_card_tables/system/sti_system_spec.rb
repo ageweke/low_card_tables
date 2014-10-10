@@ -63,6 +63,10 @@ describe "LowCardTables STI support" do
       account1 = all_accounts.detect { |a| a.id == account1.id }
       account2 = all_accounts.detect { |a| a.id == account2.id }
 
+      admin_accounts = ::AdminAccount.all.to_a
+      expect(admin_accounts.length).to eq(1)
+      expect(admin_accounts.first.id).to eq(account2.id)
+
       expect(account1.class.name).to eq('Account')
       expect(account2.class.name).to eq('AdminAccount')
 

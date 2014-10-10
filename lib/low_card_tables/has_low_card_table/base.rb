@@ -86,10 +86,30 @@ module LowCardTables
           _low_card_associations_manager.association_containing_method_named(inheritance_column)
         end
 
+        def descends_from_active_record?
+          out = super
+
+          if out && (self != ::ActiveRecord::Base) && (! superclass.abstract_class?) && (superclass != ::ActiveRecord::Base)
+            out = false if association_for_inheritance_column
+          end
+
+          out
+        end
+
+        def type_condition(table = arel_table)
+          if (association = association_for_inheritance_column)
+            sti_names  = ([self] + descendants).map { |model| model.sti_name }
+
+            ids = association.low_card_class.low_card_ids_matching(inheritance_column => sti_names).to_a
+            table[association.foreign_key_column_name].in(ids)
+          else
+            super
+          end
+        end
+
         def discriminate_class_for_record(record, call_super = true)
           if (! record[inheritance_column])
-            association = association_for_inheritance_column
-            if association
+            if (association = association_for_inheritance_column)
               foreign_key = record[association.foreign_key_column_name]
               low_card_row = association.low_card_class.low_card_row_for_id(foreign_key)
               type = low_card_row.send(inheritance_column)
