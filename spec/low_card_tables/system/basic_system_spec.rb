@@ -64,6 +64,20 @@ describe "LowCardTables basic operations" do
       user1_v2.donation_level.should == 3
     end
 
+    it "should let you set options via a scope, and create those correctly in #new" do
+      pending
+      scope = User.where(:deleted => false, :deceased => true, :gender => 'male', :donation_level => 7)
+      user2 = scope.new
+      user2.name = 'User2'
+      user2.save!
+
+      user2_again = User.where(:name => 'User2').first
+      expect(user2_again.deleted).to be_false
+      expect(user2_again.deceased).to be_true
+      expect(user2_again.gender).to eq('male')
+      expect(user2_again.donation_level).to eq(7)
+    end
+
     it "should expose a low-card row, but not with an ID, when read in from the DB" do
       @user1.status.should be
       @user1.status.id.should_not be
