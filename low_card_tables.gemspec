@@ -21,12 +21,6 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rake"
   s.add_development_dependency "rspec", "~> 2.14"
 
-  if (RUBY_VERSION =~ /^1\.9\./ || RUBY_VERSION =~ /^2\.0\./) && ((! defined?(RUBY_ENGINE)) || (RUBY_ENGINE != 'jruby'))
-    s.add_development_dependency "pry"
-    s.add_development_dependency "pry-debugger"
-    s.add_development_dependency "pry-stack_explorer"
-  end
-
   ar_version = ENV['LOW_CARD_TABLES_AR_TEST_VERSION']
   ar_version = ar_version.strip if ar_version
 
