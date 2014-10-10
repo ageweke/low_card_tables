@@ -129,7 +129,7 @@ module LowCardTables
       end
 
       def invalid_config_file!
-        raise Errno::ENOENT, %{In order to run specs for LowCardTables, you need to create a file at:
+        raise InvalidDatabaseConfigurationError, %{In order to run specs for LowCardTables, you need to create a file at:
 
 #{config_file_path}
 
