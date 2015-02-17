@@ -101,9 +101,9 @@ describe "LowCardTables association options" do
     user1.deceased = false
     user1.gender = 'female'
 
-    start_time = Time.now.to_i
+    start_time = Time.now.to_f.floor
     user1.save!
-    end_time = Time.now.to_i
+    end_time = Time.now.to_f.ceil
 
     ::UserStatusExcludeCreatedUpdated.count.should == 1
     ::UserStatusExcludeCreatedUpdated.first.created_at.to_i.should >= start_time
@@ -126,6 +126,7 @@ describe "LowCardTables association options" do
     ::UserStatusExcludeCreatedUpdated.first.updated_at.to_i.should >= start_time
     ::UserStatusExcludeCreatedUpdated.first.updated_at.to_i.should <= end_time
   end
+
   context "with standard setup" do
     before :each do
       create_standard_system_spec_tables!
