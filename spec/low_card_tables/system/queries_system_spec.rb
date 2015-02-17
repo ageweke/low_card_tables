@@ -125,29 +125,31 @@ describe "LowCardTables query support" do
     check_user_ids(::User.bar, [ @user1, @user2, @user3, @user5, @user6 ])
   end
 
-  it "should blow up if you constrain on low-card foreign keys in a static scope" do
-    lambda do
-      LowCardTables::VersionSupport.define_default_scope(::User, nil)
-      class ::User < ::ActiveRecord::Base
-        scope :foo, where(:deleted => false)
-      end
-    end.should raise_error(LowCardTables::Errors::LowCardStaticScopeError, /user_status_id/mi)
+  if ::LowCardTables::VersionSupport.allows_static_scopes?
+    it "should blow up if you constrain on low-card foreign keys in a static scope" do
+      lambda do
+        LowCardTables::VersionSupport.define_default_scope(::User, nil)
+        class ::User < ::ActiveRecord::Base
+          scope :foo, where(:deleted => false)
+        end
+      end.should raise_error(LowCardTables::Errors::LowCardStaticScopeError, /user_status_id/mi)
 
-    lambda do
-      LowCardTables::VersionSupport.define_default_scope(::User, nil)
-      class ::User < ::ActiveRecord::Base
-        scope :foo, where(:user_status_id => ::UserStatus.low_card_ids_matching(:deleted => false))
-      end
-    end.should raise_error(LowCardTables::Errors::LowCardStaticScopeError, /user_status_id/mi)
-  end
-
-
-  it "should not blow up if you constrain on other things in a static scope" do
-    LowCardTables::VersionSupport.define_default_scope(::User, nil)
-    class ::User < ::ActiveRecord::Base
-      scope :foo, where(:name => %w{foo bar})
+      lambda do
+        LowCardTables::VersionSupport.define_default_scope(::User, nil)
+        class ::User < ::ActiveRecord::Base
+          scope :foo, where(:user_status_id => ::UserStatus.low_card_ids_matching(:deleted => false))
+        end
+      end.should raise_error(LowCardTables::Errors::LowCardStaticScopeError, /user_status_id/mi)
     end
 
-    ::User.first.should be
+
+    it "should not blow up if you constrain on other things in a static scope" do
+      LowCardTables::VersionSupport.define_default_scope(::User, nil)
+      class ::User < ::ActiveRecord::Base
+        scope :foo, where(:name => %w{foo bar})
+      end
+
+      ::User.first.should be
+    end
   end
 end

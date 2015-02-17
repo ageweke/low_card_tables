@@ -65,7 +65,7 @@ describe "LowCardTables basic operations" do
     end
 
     it "should let you set options via a scope, and create those correctly in #new" do
-      pending
+      pending "This does not work yet, and it will require a major refactor of low_card_tables"
       scope = User.where(:deleted => false, :deceased => true, :gender => 'male', :donation_level => 7)
       user2 = scope.new
       user2.name = 'User2'
