@@ -88,20 +88,18 @@ describe LowCardTables::LowCardTable::RowManager do
       allow(@low_card_model).to receive(:reset_column_information)
       allow(@low_card_model).to receive(:table_exists?).and_return(true)
       allow(@low_card_model).to receive(:table_name).and_return("thetablename")
+      allow(@low_card_model).to receive(:primary_key).and_return('id')
 
       @table_unique_index = double("table_unique_index")
       allow(LowCardTables::LowCardTable::TableUniqueIndex).to receive(:new).with(@low_card_model).and_return(@table_unique_index)
 
       @column_id = double("column_id")
       allow(@column_id).to receive(:name).and_return("id")
-      allow(@column_id).to receive(:primary).and_return(true)
       @column_foo = double("column_foo")
       allow(@column_foo).to receive(:name).and_return("foo")
-      allow(@column_foo).to receive(:primary).and_return(false)
       allow(@column_foo).to receive(:default).and_return(nil)
       @column_bar = double("column_bar")
       allow(@column_bar).to receive(:name).and_return("bar")
-      allow(@column_bar).to receive(:primary).and_return(false)
       allow(@column_bar).to receive(:default).and_return('yohoho')
       allow(@low_card_model).to receive(:columns).and_return([ @column_id, @column_foo, @column_bar ])
 
@@ -332,7 +330,6 @@ describe LowCardTables::LowCardTable::RowManager do
         it "should accept hashes containing valid data, if it isn't found the first time through" do
           column_baz = double("column_bar")
           allow(column_baz).to receive(:name).and_return("baz")
-          allow(column_baz).to receive(:primary).and_return(false)
 
           columns_to_return = [
             [ @column_id, @column_foo, @column_bar ],
@@ -865,15 +862,12 @@ describe LowCardTables::LowCardTable::RowManager do
 
       it "should exclude primary keys, created/updated_at, and options-specified column names" do
         column_created_at = double("column_created_at")
-        allow(column_created_at).to receive(:primary).and_return(false)
         allow(column_created_at).to receive(:name).and_return("created_at")
 
         column_updated_at = double("column_updated_at")
-        allow(column_updated_at).to receive(:primary).and_return(false)
         allow(column_updated_at).to receive(:name).and_return("updated_at")
 
         column_skipped = double("column_skipped")
-        allow(column_skipped).to receive(:primary).and_return(false)
         allow(column_skipped).to receive(:name).and_return("FooFle")
 
         columns = [ @column_id, @column_foo, @column_bar, @column_created_at, @column_updated_at, @column_skipped ]
