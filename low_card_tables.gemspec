@@ -38,6 +38,7 @@ Gem::Specification.new do |s|
 
   ar_import_version = case ar_version
   when nil then nil
+  when /^4\.2\./ then '~> 0.7.0'
   when 'master', /^4\.0\./, /^4\.1\./ then '~> 0.4.1'
   when /^3\.0\./ then '~> 0.2.11'
   when /^3\.1\./, /^3\.2\./ then '~> 0.3.1'
