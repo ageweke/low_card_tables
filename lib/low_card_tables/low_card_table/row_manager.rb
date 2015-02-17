@@ -593,7 +593,9 @@ equivalent of 'LOCK TABLE'(s) in your database.}
         missing = missing.select do |missing_column_name|
           column = @low_card_model.columns.detect { |c| c.name.to_s.strip.downcase == missing_column_name.to_s.strip.downcase }
           if column && column.default
-            hash[column.name] = column.default
+            the_default = column.default
+            the_default = column.type_cast_from_database(the_default) if column.respond_to?(:type_cast_from_database)
+            hash[column.name] = the_default
             false
           else
             true
