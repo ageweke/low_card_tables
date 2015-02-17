@@ -192,7 +192,7 @@ on this object, and it will save, but make sure you understand ALL the implicati
         # Gems or by client code, since many of the names are pretty generic (e.g., +all_rows+).
         [ :all_rows, :row_for_id, :rows_for_ids, :rows_matching, :ids_matching, :find_ids_for, :find_or_create_ids_for,
           :find_rows_for, :find_or_create_rows_for, :flush_cache!, :referring_models, :value_column_names, :referred_to_by,
-          :collapse_rows_and_update_referrers!, :ensure_has_unique_index!, :remove_unique_index! ].each do |delegated_method_name|
+          :collapse_rows_and_update_referrers!, :ensure_has_unique_index!, :remove_unique_index!, :type_cast_id ].each do |delegated_method_name|
           define_method("low_card_#{delegated_method_name}") do |*args|
             _low_card_row_manager.send(delegated_method_name, *args)
           end

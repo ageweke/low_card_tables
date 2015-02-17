@@ -115,6 +115,15 @@ module LowCardTables
         rows_for_ids(id)
       end
 
+      def type_cast_id(id)
+        column = @low_card_model.columns_hash[@low_card_model.primary_key]
+        if column.respond_to?(:type_cast_from_database)
+          column.type_cast_from_database(id)
+        else
+          column.type_cast(id)
+        end
+      end
+
       # Given a single Hash specifying zero or more constraints for low-card rows (i.e., mapping zero or more columns
       # of the low-card table to specific values for those columns), returns a (possibly empty) Array of IDs of
       # low-card rows that match those constraints.

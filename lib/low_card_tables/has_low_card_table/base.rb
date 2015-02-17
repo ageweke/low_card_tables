@@ -111,6 +111,8 @@ module LowCardTables
           if (! record[inheritance_column])
             if (association = association_for_inheritance_column)
               foreign_key = record[association.foreign_key_column_name]
+
+              foreign_key = association.low_card_class.low_card_type_cast_id(foreign_key)
               low_card_row = association.low_card_class.low_card_row_for_id(foreign_key)
               type = low_card_row.send(inheritance_column)
 
