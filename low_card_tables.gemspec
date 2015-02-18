@@ -63,9 +63,9 @@ Gem::Specification.new do |s|
   # and use an earlier version of that Gem.
   if database_gem_name && database_gem_name == 'mysql2' && ar_version && ar_version =~ /^3\.0\./
     s.add_development_dependency(database_gem_name, '~> 0.2.0')
-  # The 'pg' gem removed Ruby 1.8 compatibility as of 0.18.1.
+  # The 'pg' gem removed Ruby 1.8 compatibility as of 0.18.
   elsif database_gem_name && database_gem_name == 'pg' && RUBY_VERSION =~ /^1\.8\./
-    s.add_development_dependency(database_gem_name, '< 0.18.1')
+    s.add_development_dependency(database_gem_name, '< 0.18.0')
   else
     s.add_development_dependency(database_gem_name)
   end
