@@ -57,7 +57,10 @@ Gem::Specification.new do |s|
   # Ugh. Later versions of the 'mysql2' gem are incompatible with AR 3.0.x; so, here, we explicitly trap that case
   # and use an earlier version of that Gem.
   if database_gem_name && database_gem_name == 'mysql2' && ar_version && ar_version =~ /^3\.0\./
-    s.add_development_dependency('mysql2', '~> 0.2.0')
+    s.add_development_dependency(database_gem_name, '~> 0.2.0')
+  # The 'pg' gem removed Ruby 1.8 compatibility as of 0.18.1.
+  elsif database_gem_name && database_gem_name == 'pg' && RUBY_VERSION =~ /^1\.8\./
+    s.add_development_dependency(database_gem_name, '< 0.18.1')
   else
     s.add_development_dependency(database_gem_name)
   end
