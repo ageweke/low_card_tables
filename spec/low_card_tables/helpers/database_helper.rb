@@ -84,7 +84,7 @@ module LowCardTables
               :require => 'activerecord-jdbcpostgresql-adapter',
               :database_gem_name => 'activerecord-jdbcpostgresql-adapter',
               :config => {
-                :adapter => 'jdbcpostgresql',
+                :adapter => 'postgresql',
                 :database => 'myapp_test',
                 :username => 'travis',
                 :encoding => 'utf8'
