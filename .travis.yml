@@ -93,3 +93,11 @@ matrix:
         #     env: LOW_CARD_TABLES_AR_TEST_VERSION=4.0.13 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=sqlite
         # -   rvm: jruby-1.7.15
         #     env: LOW_CARD_TABLES_AR_TEST_VERSION=4.1.9 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=sqlite
+
+    allow_failures:
+        # As of this writing (2015-02-18), activerecord-jdbc doesn't support ActiveRecord 4.2.x
+        # completely.
+        -   rvm: jruby-1.7.19
+            env: LOW_CARD_TABLES_AR_TEST_VERSION=4.2.0 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=mysql
+        -   rvm: jruby-1.7.19
+            env: LOW_CARD_TABLES_AR_TEST_VERSION=4.2.0 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=postgres
