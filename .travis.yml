@@ -29,7 +29,7 @@ env:
     - LOW_CARD_TABLES_AR_TEST_VERSION=4.2.0 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=postgres
     # - LOW_CARD_TABLES_AR_TEST_VERSION=4.2.0 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=sqlite
 before_script:
-    - export JRUBY_OPTS="-J-Xmx256m -J-Xms256m $JRUBY_OPTS"
+    - export JRUBY_OPTS="-J-Xmx512m -J-Xms512m $JRUBY_OPTS"
     - mysql -e 'create database myapp_test;'
     - psql -c 'create database myapp_test;' -U postgres
 matrix:
