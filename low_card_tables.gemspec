@@ -51,6 +51,11 @@ Gem::Specification.new do |s|
     s.add_dependency("activerecord-import")
   end
 
+  # i18n released an 0.7.0 that's incompatible with Ruby 1.8.
+  if RUBY_VERSION =~ /^1\.8\./
+    s.add_development_dependency 'i18n', '< 0.7.0'
+  end
+
   require File.expand_path(File.join(File.dirname(__FILE__), 'spec', 'low_card_tables', 'helpers', 'database_helper'))
   database_gem_name = LowCardTables::Helpers::DatabaseHelper.maybe_database_gem_name
 

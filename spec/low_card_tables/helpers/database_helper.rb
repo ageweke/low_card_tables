@@ -79,6 +79,28 @@ module LowCardTables
                 :encoding => 'utf8'
               }
             }
+          when 'postgres', 'postgresql'
+            {
+              :require => 'activerecord-jdbcpostgresql-adapter',
+              :database_gem_name => 'activerecord-jdbcpostgresql-adapter',
+              :config => {
+                :adapter => 'jdbcpostgresql',
+                :database => 'myapp_test',
+                :username => 'travis',
+                :encoding => 'utf8'
+              }
+            }
+          when 'sqlite'
+            {
+              :require => 'activerecord-jdbcsqlite3-adapter',
+              :database_gem_name => 'activerecord-jdbcsqlite3-adapter',
+              :config => {
+                :adapter => 'jdbcsqlite3',
+                :database => 'myapp_test',
+                :username => 'travis',
+                :encoding => 'utf8'
+              }
+            }
           when '', nil then nil
           else
             raise "Unknown Travis CI database type: #{dbtype.inspect}"

@@ -15,3 +15,8 @@ end
 if version_spec
   gem("activerecord", version_spec)
 end
+
+# gem 'pry'
+# gem 'pry-byebug'
+# gem 'pry-rescue'
+# gem 'pry-stack_explorer'
