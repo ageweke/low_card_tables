@@ -103,7 +103,11 @@ module LowCardTables
             ids = association.low_card_class.low_card_ids_matching(inheritance_column => sti_names).to_a
             table[association.foreign_key_column_name].in(ids)
           else
-            super
+            if ::ActiveRecord::Base.method(:type_condition).arity.abs >= 1
+              super
+            else
+              super()
+            end
           end
         end
 
@@ -151,10 +155,12 @@ module LowCardTables
             if sti_class
               record_id = sti_class.primary_key && record[sti_class.primary_key]
 
-              if ::ActiveRecord::IdentityMap.enabled? && record_id
+              if defined?(::ActiveRecord::IdentityMap) && ::ActiveRecord::IdentityMap.enabled? && record_id
                 instance = use_identity_map(sti_class, record_id, record)
               else
-                instance = sti_class.allocate.init_with('attributes' => record)
+                instance = sti_class.allocate
+                instance.init_with('attributes' => record)
+                instance
               end
 
               instance
