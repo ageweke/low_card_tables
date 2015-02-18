@@ -60,11 +60,17 @@ matrix:
             env: LOW_CARD_TABLES_AR_TEST_VERSION=3.1.12 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=postgres
         -   rvm: 2.0.0-p598
             env: LOW_CARD_TABLES_AR_TEST_VERSION=3.1.12 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=sqlite
-        -   rvm: 2.1.2
+        -   rvm: 2.1.5
             env: LOW_CARD_TABLES_AR_TEST_VERSION=3.1.12 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=mysql
-        -   rvm: 2.1.2
+        -   rvm: 2.1.5
             env: LOW_CARD_TABLES_AR_TEST_VERSION=3.1.12 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=postgres
-        -   rvm: 2.1.2
+        -   rvm: 2.1.5
+            env: LOW_CARD_TABLES_AR_TEST_VERSION=3.1.12 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=sqlite
+        -   rvm: 2.2.0
+            env: LOW_CARD_TABLES_AR_TEST_VERSION=3.1.12 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=mysql
+        -   rvm: 2.2.0
+            env: LOW_CARD_TABLES_AR_TEST_VERSION=3.1.12 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=postgres
+        -   rvm: 2.2.0
             env: LOW_CARD_TABLES_AR_TEST_VERSION=3.1.12 LOW_CARD_TABLES_TRAVIS_CI_DATABASE_TYPE=sqlite
         # The activerecord-import gem currently doesn't support JRuby JDBC adapters with anything but MySQL
         # -   rvm: jruby-1.7.15
