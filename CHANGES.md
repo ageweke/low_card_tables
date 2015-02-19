@@ -1,5 +1,9 @@
 # `low_card_tables` Changelog
 
+## 1.1.1,
+
+* Fixed an issue where, if you installed another ActiveRecord-related gem installed that defined a method `primary_keys` on a model that returned an empty array, `low_card_tables` would incorrectly behave as if the low-card table had no primary key at all, and expect you to include `id` in the all-columns index.
+
 ## 1.1.0, 2015-02-18
 
 * The [single-table inheritance](http://api.rubyonrails.org/classes/ActiveRecord/Base.html#label-Single+table+inheritance) type-discrimination column &mdash; by default called `type` &mdash; can now be part of a low-cardinality table itself. This elegantly allows you to use STI without consuming the very large amounts of space required by Rails' default implementation, where it stores the name of the class in every single row.

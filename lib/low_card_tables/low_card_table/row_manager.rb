@@ -539,15 +539,15 @@ equivalent of 'LOCK TABLE'(s) in your database.}
       # metadata and shouldn't play a direct role in the low-card system).
       def column_names_to_skip
         @column_names_to_skip ||= begin
-          primary_keys = if @low_card_model.respond_to?(:primary_keys)
-            Array(@low_card_model.primary_keys)
-          else
-            Array(@low_card_model.primary_key)
-          end
+          primary_keys = [ ]
+          primary_keys += Array(@low_card_model.primary_keys || [ ]) if @low_card_model.respond_to?(:primary_keys)
+          primary_keys += Array(@low_card_model.primary_key || [ ]) if @low_card_model.respond_to?(:primary_key)
 
-          primary_keys +
+          out = (primary_keys +
           COLUMN_NAMES_TO_ALWAYS_SKIP +
-          Array(@low_card_model.low_card_options[:exclude_column_names] || [ ]).map { |n| n.to_s.strip.downcase }
+          Array(@low_card_model.low_card_options[:exclude_column_names] || [ ]))
+
+          out.map { |n| n.to_s.strip.downcase }.compact.uniq
         end
       end
 
